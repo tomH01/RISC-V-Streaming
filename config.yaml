@@ -1,0 +1,6 @@
+targets:
+  - name: simulation
+    tools:
+      - cadence xcelium: 23.09
+  - name: eval
+    tools: []
