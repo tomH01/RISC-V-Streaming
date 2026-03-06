@@ -8,12 +8,11 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-`define L2_BANK_SIZE 16384
-`define MACRO_SIZE_PRI0 8192
+`define L2_BANK_SIZE 512
+`define MACRO_SIZE_PRI0 256
 `define NB_L2_PRI0_MACROS 2
-`define NB_L2_PW_MODES 4
 
-`define SYNOPSYS_MACRO_PRI0 sadclssd4LOW1p8192x32m16b2w1c0p1d0l0rm3sdrw01_wrapper
+`define SYNOPSYS_MACRO_PRI0 sadclssd4LOW1p256x32m16b1w1c0p1d0l0rm3sdrw01_wrapper
 
 // Private bank 0
 `define SOC_MEM_MAP_PRIVATE_BANK0_START_ADDR 32'h1C00_0000
@@ -29,7 +28,7 @@ module memory_simple #() (
     input logic          wen,
     input logic [31:0]   wdata,
     input logic [3:0]    be,
-    input logic          gnt,
+    output logic          gnt,
     // ################################
     // Bus Interface - RESPONSE CHANNEL
     output logic         r_opc,
