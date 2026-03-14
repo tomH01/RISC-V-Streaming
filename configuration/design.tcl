@@ -9,16 +9,41 @@
 set in_stream_channel [EDA::Design::createComponent in_stream_channel]
 
 $in_stream_channel addHDLSourceFiles [list \
-  "src/hdl/in_stream_channel.sv" 
+  "src/hdl/dma/ingress/in_stream_channel.sv" 
 ]
 
 $in_stream_channel addPythonSimFiles [list \
-  "src/test/test_in_stream_channel.py" \
+  "src/test/dma/ingress/test_in_stream_channel.py" \
 ]
 
+
+set buffer_pool [EDA::Design::createComponent buffer_pool]
+
+$buffer_pool addHDLSourceFiles [list \
+  "src/hdl/dma/ingress/buffer_pool.sv" \
+  "src/hdl/memory/buffer_sram_macro.sv" \
+]
+
+$buffer_pool addPythonSimFiles [list \
+  "src/test/dma/ingress/test_buffer_pool.py" \
+]
+
+
+set ingress_crossbar [EDA::Design::createComponent ingress_crossbar]
+
+$ingress_crossbar addHDLSourceFiles [list \
+  "src/hdl/dma/ingress/ingress_crossbar.sv" \
+]
+
+$ingress_crossbar addPythonSimFiles [list \
+  "src/test/dma/ingress/test_ingress_crossbar.py" \
+]
+
+
 set memory_simple [EDA::Design::createComponent memory_simple]
+
 $memory_simple addHDLSourceFiles [list \
-  "src/hdl/memory_simple.sv"
+  "src/hdl/memory/memory_simple.sv"
   ]
   
 $memory_simple addPythonSimFiles [list \
