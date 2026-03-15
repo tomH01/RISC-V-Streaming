@@ -36,19 +36,19 @@ class BufferPoolDriver:
         self.m_macros = m_macros
         self.nb_read_ports = nb_read_ports
         
-        self.dut.macro_owner.value = 0
-        self.dut.in_req.value = 0
+        self.dut.macro_owner_i.value = 0
+        self.dut.ingress_req_i.value = 0
 
         for i in range(self.m_macros):
-            self.dut.in_add[i].value = 0
-            self.dut.in_wdata[i].value = 0
-            self.dut.in_be[i].value = 0
+            self.dut.ingress_add_i[i].value = 0
+            self.dut.ingress_wdata_i[i].value = 0
+            self.dut.ingress_be_i[i].value = 0
 
-        self.dut.out_req.value = 0
+        self.dut.egress_req_i.value = 0
 
         for i in range(nb_read_ports):
-            self.dut.out_add[i].value = 0
-            self.dut.out_macro_select[i].value = 0
+            self.dut.egress_add_i[i].value = 0
+            self.dut.egress_macro_select_i[i].value = 0
 
     async def reset(self):
         self.dut.rst_ni.value = 0
@@ -58,50 +58,51 @@ class BufferPoolDriver:
         await RisingEdge(self.dut.clk_i)
 
     def set_owner(self, macro_idx, owner):
-        self.dut.macro_owner[macro_idx].value = owner
+        self.dut.macro_owner_i[macro_idx].value = owner
 
     async def write_ingress(self, macro_idx, addr, data, be=0xF):
         cover_address(addr)
         cover_byte_enable(be)
 
-        self.dut.in_add[macro_idx].value = addr
-        self.dut.in_wdata[macro_idx].value = data
-        self.dut.in_be[macro_idx].value = be
-        self.dut.in_req[macro_idx].value = 1
+        self.dut.ingress_req_i[macro_idx].value = 1     
+        self.dut.ingress_add_i[macro_idx].value = addr
+        self.dut.ingress_wdata_i[macro_idx].value = data
+        self.dut.ingress_be_i[macro_idx].value = be
+        
 
         await RisingEdge(self.dut.clk_i)
         await ReadOnly()
 
-        gnt = self.dut.in_gnt[macro_idx].value
+        gnt = self.dut.ingress_gnt_o[macro_idx].value
         assert gnt == 1, f"Ingress grant failed for macro {macro_idx}."
 
         await RisingEdge(self.dut.clk_i)
-        self.dut.in_req[macro_idx].value = 0
+        self.dut.ingress_req_i[macro_idx].value = 0
 
 
     async def read_egress(self, port_idx, macro_idx, addr):
         cover_egress_select(macro_idx)
         cover_address(addr)
 
-        self.dut.out_macro_select[port_idx].value = macro_idx
-        self.dut.out_add[port_idx].value = addr
-        self.dut.out_req[port_idx].value = 1
+        self.dut.egress_req_i[port_idx].value = 1
+        self.dut.egress_add_i[port_idx].value = addr
+        self.dut.egress_macro_select_i[port_idx].value = macro_idx
 
         await RisingEdge(self.dut.clk_i)
         await ReadOnly()
 
-        gnt = self.dut.out_gnt[port_idx].value
+        gnt = self.dut.egress_gnt_o[port_idx].value
         assert gnt == 1, f"Ingress grant failed for port {port_idx}."
 
         await RisingEdge(self.dut.clk_i)
-        self.dut.out_req[port_idx].value = 0
+        self.dut.egress_req_i[port_idx].value = 0
 
         await ReadOnly()
 
-        valid = self.dut.out_r_valid[port_idx].value
+        valid = self.dut.egress_r_valid_o[port_idx].value
         assert valid == 1, f"Egress r_valid for port {port_idx} missing."
 
-        data = self.dut.out_r_rdata[port_idx].value
+        data = self.dut.egress_r_rdata_o[port_idx].value
         return data
     
 

@@ -5,6 +5,7 @@
 */
 
 module alloc_manager #(
+  parameter int N_STREAMS   = 4,
   parameter int M_MACROS    = 16,
   parameter int MACRO_DEPTH = 256
 
