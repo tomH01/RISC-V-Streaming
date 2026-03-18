@@ -3,3 +3,6 @@ output*/
 __pycache__
 .simvision
 simvision*
+
+src/hdl/old/
+src/test/old/

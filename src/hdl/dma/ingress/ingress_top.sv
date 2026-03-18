@@ -3,22 +3,44 @@ module ingress_top #(
   parameter int M_MACROS   = 8,
   parameter int DATA_WIDTH = 32,
   parameter int ADD_WIDTH  = 32,
-  parameter int NB_READ_PORTS = 1 
+  parameter int MACRO_DEPTH = 256
 )(
   input logic clk_i,
   input logic rst_ni,
 
+  // Stream IF
   input logic [DATA_WIDTH-1:0] stream_data_i  [N_STREAMS],
   input logic                  stream_valid_i [N_STREAMS],
-  output logic                 stream_ready_o [N_STREAMS]
+  output logic                 stream_ready_o [N_STREAMS],
+
+  // Buffer Pool IF
+  input logic  [M_MACROS-1:0]   bp_gnt_i,
+  output logic [M_MACROS-1:0]   bp_req_o,
+  output logic [ADD_WIDTH-1:0]  bp_add_o   [M_MACROS],
+  output logic [DATA_WIDTH-1:0] bp_wdata_o [M_MACROS],
+  output logic [3:0]            bp_be_o    [M_MACROS],
+
+  // Control IF
+  input logic [N_STREAMS-1:0]                    cfg_stream_en_i,
+  input logic [$clog2(MACRO_DEPTH*M_MACROS)-1:0] cfg_window_size_i  [N_STREAMS],
+  input logic [$clog2(M_MACROS)-1:0]             cfg_start_macro_i  [N_STREAMS],
+  input logic [$clog2(M_MACROS)-1:0]             cfg_next_pointer_i [M_MACROS]
+
+  // CPU IF
+
+  // TODO: Implement
+
+  // Egress IF
+  output logic [N_STREAMS-1:0]        notify_valid_o,
+  output logic [$clog2(M_MACROS)-1:0] notify_start_macro_o [N_STREAMS]
 );
 
   // ############
   // N In-Streams
 
   logic [DATA_WIDTH-1:0] ch_data  [N_STREAMS];
-  logic                  ch_valid [N_STREAMS];
-  logic                  ch_ready [N_STREAMS];
+  logic [N_STREAMS-1:0]  ch_valid;
+  logic [N_STREAMS-1:0]  ch_ready;
 
   generate
     for (genvar i = 0; i < N_STREAMS; i++) begin : gen_in_stream_channels
@@ -49,23 +71,39 @@ module ingress_top #(
   logic [ADD_WIDTH-1:0]        am_add       [N_STREAMS];
   logic [N_STREAMS-1:0]        am_req;
   
-  // TODO: implement alloc manager module
-  logic [M_MACROS-1:0] macro_owner;
-  // macro_owner must be connect to the associated output
+  alloc_manager #(
+    .N_STREAMS(N_STREAMS),
+    .M_MACROS(M_MACROS),
+    .DATA_WIDTH(DATA_WIDTH),
+    .ADD_WIDTH(ADD_WIDTH),
+    .MACRO_DEPTH(MACRO_DEPTH)
+  )(
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+
+    .cfg_stream_en_i(cfg_stream_en_i),
+    .cfg_window_size_i(cfg_window_size_i),
+    .cfg_start_macro_i(cfg_start_macro_i),
+    .cfg_next_pointer_i(cfg_next_pointer_i),
+
+    .stream_valid_i(ch_valid),
+    .stream_gnt_i(ch_ready),
+
+    .am_macro_sel_o(am_macro_sel),
+    .am_req_o(am_req),
+    .am_add_o(am_add),
+
+    .window_valid_o(notify_valid_o),
+    .window_start_o(notify_start_macro_o)
+  );
   
 
   // ################
   // Ingress Crossbar
 
-  logic [M_MACROS-1:0]   bp_gnt;
-  logic [M_MACROS-1:0]   bp_req;
-  logic [ADD_WIDTH-1:0]  bp_add   [M_MACROS];
-  logic [DATA_WIDTH-1:0] bp_wdata [M_MACROS];
-  logic [3:0]            bp_be    [M_MACROS];
-
   ingress_crossbar #(
+    .N_STREAMS(N_STREAMS),
     .M_MACROS(M_MACROS),
-    .NB_READ_PORTS(NB_READ_PORTS),
     .DATA_WIDTH(DATA_WIDTH),
     .ADD_WIDTH(ADD_WIDTH)
   )(
@@ -73,44 +111,14 @@ module ingress_top #(
     .stream_ready_o(ch_ready),
 
     .am_macro_sel_i(am_macro_sel),
-    .am_add_i(am_add),
     .am_req_i(am_req),
+    .am_add_i(am_add),
 
-    .bp_gnt_i(bp_gnt),
-    .bp_req_o(bp_req),
-    .bp_add_o(bp_add),
-    .bp_wdata_o(bp_wdata),
-    .bp_be_o(bp_be)
+    .bp_gnt_i(bp_gnt_i),
+    .bp_req_o(bp_req_o),
+    .bp_add_o(bp_add_o),
+    .bp_wdata_o(bp_wdata_o),
+    .bp_be_o(bp_be_o)
   );
 
-
-  // ###########
-  // Buffer Pool
-
-  // Maybe Buffer Poool in dma_top as interface module to only expose ingress ports here
-  buffer_pool #(
-    .M_MACROS(M_MACROS),
-    .NB_READ_PORTS(NB_READ_PORTS),
-    .DATA_WIDTH(DATA_WIDTH),
-    .ADD_WIDTH(ADD_WIDTH)
-  )(
-    .clk_i(clk_i),
-    .rst_ni(rst_ni),
-
-    .macro_owner(macro_owner),
-
-    .ingress_req_i(bp_req),
-    .ingress_add_i(bp_add),
-    .ingress_wdata_i(bp_wdata),
-    .ingress_be_i(bp_be),
-    .ingress_gnt_o(bp_gnt),
-
-    .egress_req_i(),
-    .egress_add_i(),
-    .egress_macro_select_i(),
-    .egress_gnt_o(),
-    .egress_r_opc_o(),
-    .egress_r_rdata_o(),
-    .egress_r_valid_o()
-  );
 endmodule

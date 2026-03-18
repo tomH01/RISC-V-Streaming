@@ -10,8 +10,8 @@ module ingress_crossbar #(
 
   // Alloc Manager IF
   input logic [$clog2(M_MACROS)-1:0] am_macro_sel_i [N_STREAMS],
-  input logic [ADD_WIDTH-1:0]        am_add_i       [N_STREAMS],
   input logic [N_STREAMS-1:0]        am_req_i,
+  input logic [ADD_WIDTH-1:0]        am_add_i       [N_STREAMS],
 
 
   // Buffer Pool IF

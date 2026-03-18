@@ -12,6 +12,7 @@ module in_stream_channel #(
   // Output stream interface
   output logic [DATA_WIDTH-1:0] data_o,
   output logic valid_o,
+  output logic alloc_req_o,
   input logic ready_i
 );
   logic [DATA_WIDTH-1:0] data_reg;
@@ -20,9 +21,10 @@ module in_stream_channel #(
   logic [DATA_WIDTH-1:0] skid_reg;
   logic skid_valid;
 
-  assign ready_o = ~skid_valid;
-  assign data_o = data_reg;
-  assign valid_o = reg_valid;
+  assign ready_o     = ~skid_valid || ready_i;
+  assign data_o      = data_reg;
+  assign valid_o     = reg_valid;
+  assign alloc_req_o = valid_i && ready_o
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
