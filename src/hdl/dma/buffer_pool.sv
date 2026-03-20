@@ -2,7 +2,7 @@ module buffer_pool #(
   parameter int M_MACROS      = 16,
   parameter int NB_READ_PORTS = 1,
   parameter int DATA_WIDTH    = 32,
-  parameter int ADD_WIDTH     = 32,
+  parameter int ADDR_WIDTH    = 32,
   parameter int MACRO_DEPTH   = 256
 )(
   input logic clk_i,
@@ -13,7 +13,7 @@ module buffer_pool #(
   // ###############
   // Ingress Channel
   input logic  [M_MACROS-1:0]   ingress_req_i,
-  input logic  [ADD_WIDTH-1:0]  ingress_add_i   [M_MACROS],
+  input logic  [ADDR_WIDTH-1:0] ingress_addr_i  [M_MACROS],
   input logic  [DATA_WIDTH-1:0] ingress_wdata_i [M_MACROS],
   input logic  [3:0]            ingress_be_i    [M_MACROS],
   output logic [M_MACROS-1:0]   ingress_gnt_o,
@@ -21,7 +21,7 @@ module buffer_pool #(
   // ##############
   // Egress Channel
   input logic  [NB_READ_PORTS-1:0]    egress_req_i,
-  input logic  [ADD_WIDTH-1:0]        egress_add_i          [NB_READ_PORTS],
+  input logic  [ADDR_WIDTH-1:0]       egress_addr_i         [NB_READ_PORTS],
   input logic  [$clog2(M_MACROS)-1:0] egress_macro_select_i [NB_READ_PORTS],
   output logic [NB_READ_PORTS-1:0]    egress_gnt_o,
   output logic [NB_READ_PORTS-1:0]    egress_r_opc_o,
@@ -30,7 +30,7 @@ module buffer_pool #(
 );
 
   logic [M_MACROS-1:0]         mux_req;
-  logic [ADD_WIDTH-1:0]        mux_add [M_MACROS];
+  logic [ADDR_WIDTH-1:0]       mux_addr [M_MACROS];
      
   logic [3:0]                  macro_be [M_MACROS]; 
   logic [M_MACROS-1:0]         macro_gnt;
@@ -68,20 +68,20 @@ module buffer_pool #(
     for (genvar i = 0; i < M_MACROS; i++) begin : gen_buffer_array
       always_comb begin
         mux_req[i]  = 1'b0;
-        mux_add[i]  = '0;
+        mux_addr[i] = '0;
         macro_be[i] = 4'b1111;
 
         if (macro_owner_i[i] == 1'b0) begin
           // Ingress - WRITE
-          mux_req[i] = ingress_req_i[i];
-          mux_add[i] = ingress_add_i[i];
+          mux_req[i]  = ingress_req_i[i];
+          mux_addr[i] = ingress_addr_i[i];
           macro_be[i] = ingress_be_i[i];
         end else begin
           // Egress - READ
           for (int p = 0; p < NB_READ_PORTS; p++) begin
             if (egress_macro_select_i[p] == i) begin
-              mux_req[i] = egress_req_i[p];
-              mux_add[i] = egress_add_i[p];
+              mux_req[i]  = egress_req_i[p];
+              mux_addr[i] = egress_addr_i[p];
             end
           end
         end
@@ -95,7 +95,7 @@ module buffer_pool #(
         .rst_ni(rst_ni),
 
         .req(mux_req[i]),
-        .add(mux_add[i]),
+        .addr(mux_addr[i]),
 
         .gnt(macro_gnt[i]),
 

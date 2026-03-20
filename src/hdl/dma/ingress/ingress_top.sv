@@ -2,7 +2,7 @@ module ingress_top #(
   parameter int N_STREAMS  = 4,
   parameter int M_MACROS   = 8,
   parameter int DATA_WIDTH = 32,
-  parameter int ADD_WIDTH  = 32,
+  parameter int ADDR_WIDTH  = 32,
   parameter int MACRO_DEPTH = 256
 )(
   input logic clk_i,
@@ -16,7 +16,7 @@ module ingress_top #(
   // Buffer Pool IF
   input logic  [M_MACROS-1:0]   bp_gnt_i,
   output logic [M_MACROS-1:0]   bp_req_o,
-  output logic [ADD_WIDTH-1:0]  bp_add_o   [M_MACROS],
+  output logic [ADDR_WIDTH-1:0] bp_addr_o  [M_MACROS],
   output logic [DATA_WIDTH-1:0] bp_wdata_o [M_MACROS],
   output logic [3:0]            bp_be_o    [M_MACROS],
 
@@ -24,11 +24,7 @@ module ingress_top #(
   input logic [N_STREAMS-1:0]                    cfg_stream_en_i,
   input logic [$clog2(MACRO_DEPTH*M_MACROS)-1:0] cfg_window_size_i  [N_STREAMS],
   input logic [$clog2(M_MACROS)-1:0]             cfg_start_macro_i  [N_STREAMS],
-  input logic [$clog2(M_MACROS)-1:0]             cfg_next_pointer_i [M_MACROS]
-
-  // CPU IF
-
-  // TODO: Implement
+  input logic [$clog2(M_MACROS)-1:0]             cfg_next_pointer_i [M_MACROS],
 
   // Egress IF
   output logic [N_STREAMS-1:0]        notify_valid_o,
@@ -47,7 +43,7 @@ module ingress_top #(
       
       in_stream_channel #(
         .DATA_WIDTH(DATA_WIDTH)
-      )(
+      ) u_in_stream_channel (
         .clk_i(clk_i),
         .rst_ni(rst_ni),
 
@@ -68,16 +64,16 @@ module ingress_top #(
   // Alloc Manager
 
   logic [$clog2(M_MACROS)-1:0] am_macro_sel [N_STREAMS];
-  logic [ADD_WIDTH-1:0]        am_add       [N_STREAMS];
+  logic [ADDR_WIDTH-1:0]       am_addr       [N_STREAMS];
   logic [N_STREAMS-1:0]        am_req;
   
   alloc_manager #(
     .N_STREAMS(N_STREAMS),
     .M_MACROS(M_MACROS),
     .DATA_WIDTH(DATA_WIDTH),
-    .ADD_WIDTH(ADD_WIDTH),
+    .ADDR_WIDTH(ADDR_WIDTH),
     .MACRO_DEPTH(MACRO_DEPTH)
-  )(
+  ) u_alloc_manager(
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
@@ -91,7 +87,7 @@ module ingress_top #(
 
     .am_macro_sel_o(am_macro_sel),
     .am_req_o(am_req),
-    .am_add_o(am_add),
+    .am_addr_o(am_addr),
 
     .window_valid_o(notify_valid_o),
     .window_start_o(notify_start_macro_o)
@@ -105,18 +101,18 @@ module ingress_top #(
     .N_STREAMS(N_STREAMS),
     .M_MACROS(M_MACROS),
     .DATA_WIDTH(DATA_WIDTH),
-    .ADD_WIDTH(ADD_WIDTH)
-  )(
+    .ADDR_WIDTH(ADDR_WIDTH)
+  ) u_ingress_crossbar (
     .stream_data_i(ch_data),
     .stream_ready_o(ch_ready),
 
     .am_macro_sel_i(am_macro_sel),
     .am_req_i(am_req),
-    .am_add_i(am_add),
+    .am_addr_i(am_addr),
 
     .bp_gnt_i(bp_gnt_i),
     .bp_req_o(bp_req_o),
-    .bp_add_o(bp_add_o),
+    .bp_addr_o(bp_addr_o),
     .bp_wdata_o(bp_wdata_o),
     .bp_be_o(bp_be_o)
   );

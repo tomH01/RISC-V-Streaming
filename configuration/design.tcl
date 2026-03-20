@@ -40,6 +40,28 @@ $ingress_crossbar addPythonSimFiles [list \
 ]
 
 
+set alloc_manager [EDA::Design::createComponent alloc_manager]
+
+$alloc_manager addHDLSourceFiles [list \
+  "src/hdl/dma/ingress/alloc_manager.sv" \
+]
+
+
+set ingress_top [EDA::Design::createComponent ingress_top]
+
+$ingress_top addHDLSourceFiles [list \
+  "src/hdl/dma/ingress/ingress_top.sv" \
+  "src/hdl/dma/ingress/in_stream_channel.sv" \
+  "src/hdl/dma/ingress/ingress_crossbar.sv" \
+  "src/hdl/dma/ingress/alloc_manager.sv" \
+]
+
+$ingress_top addPythonSimFiles [list \
+  "src/test/dma/ingress/test_ingress_top.py" \
+]
+
+
+
 set memory_simple [EDA::Design::createComponent memory_simple]
 
 $memory_simple addHDLSourceFiles [list \

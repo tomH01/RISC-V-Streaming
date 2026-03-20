@@ -9,7 +9,7 @@ async def test_crossbar_routing(dut):
     N_STREAMS = int(dut.N_STREAMS.value)
     M_MACROS = int(dut.M_MACROS.value)
     DATA_WIDTH = int(dut.DATA_WIDTH)
-    ADD_WIDTH = int(dut.ADD_WIDTH)
+    ADDR_WIDTH = int(dut.ADDR_WIDTH)
 
     NUM_TESTS = 1000
 
@@ -17,7 +17,7 @@ async def test_crossbar_routing(dut):
         targets = rnd.sample(range(M_MACROS), N_STREAMS)
 
         stream_data = [rnd.randint(0, (1 << DATA_WIDTH) - 1) for _ in range(N_STREAMS)]
-        am_add      = [rnd.randint(0, (1 << ADD_WIDTH) - 1) for _ in range(N_STREAMS)]
+        am_addr      = [rnd.randint(0, (1 << ADDR_WIDTH) - 1) for _ in range(N_STREAMS)]
 
         am_req = rnd.randint(0, (1 << N_STREAMS) - 1)
         bp_gnt = rnd.randint(0, (1 << M_MACROS) - 1)
@@ -28,7 +28,7 @@ async def test_crossbar_routing(dut):
         for n in range(N_STREAMS):
             dut.stream_data_i[n].value  = stream_data[n]
             dut.am_macro_sel_i[n].value = targets[n]
-            dut.am_add_i[n].value       = am_add[n]
+            dut.am_addr_i[n].value      = am_addr[n]
 
         await Timer(1, units='ns')
 
@@ -37,7 +37,7 @@ async def test_crossbar_routing(dut):
 
         for m in range(M_MACROS):
             bp_req_m = (bp_req >> m) & 1
-            bp_add_n = int(dut.bp_add_o[m].value)
+            bp_addr_n = int(dut.bp_addr_o[m].value)
             bp_wdata_n = int(dut.bp_wdata_o[m].value)
 
             if m in targets:
@@ -45,14 +45,14 @@ async def test_crossbar_routing(dut):
 
                 expected_req = (am_req >> n) & 1
                 assert bp_req_m == expected_req, f"Test {test_idx}: bp_req_o mismatch on macro {m}: Expected: {expected_req} Got: {bp_req_m}"
-                assert bp_add_n == am_add[n], f"Test {test_idx}: bp_add_o mismatch on macro {m}: Expected: {am_add[n]} Got: {bp_add_n}"
+                assert bp_addr_n == am_addr[n], f"Test {test_idx}: bp_addr_o mismatch on macro {m}: Expected: {am_addr[n]} Got: {bp_addr_n}"
                 assert bp_wdata_n == stream_data[n], f"Test {test_idx}: bp_wdata_o mismatch on macro {m}: Expected: {stream_data[n]} Got: {bp_wdata_n}"
 
                 expected_ready = (bp_gnt >> m) & 1
                 assert (stream_ready >> n) & 1 == expected_ready, f"Test {test_idx}: stream_ready_o mismatch on macro {m}"
             else:
                 assert bp_req_m == 0, f"Test {test_idx}: bp_req_o should be 0 on unused macro {m}: Got: {bp_req_m}"
-                assert bp_add_n == 0, f"Test {test_idx}: bp_add_o should be 0 on unused macro {m}: Got: {bp_add_n}"
+                assert bp_addr_n == 0, f"Test {test_idx}: bp_addr_o should be 0 on unused macro {m}: Got: {bp_addr_n}"
                 assert bp_wdata_n == 0, f"Test {test_idx}: bp_wdata_o should be 0 on unused macro {m}: Got: {bp_wdata_n}"
 
             assert int(dut.bp_be_o[m].value) == 0xF, f"Test {test_idx}: bp_be_o should be 0xF on macro {m}."

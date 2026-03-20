@@ -40,14 +40,14 @@ class BufferPoolDriver:
         self.dut.ingress_req_i.value = 0
 
         for i in range(self.m_macros):
-            self.dut.ingress_add_i[i].value = 0
+            self.dut.ingress_addr_i[i].value = 0
             self.dut.ingress_wdata_i[i].value = 0
             self.dut.ingress_be_i[i].value = 0
 
         self.dut.egress_req_i.value = 0
 
         for i in range(nb_read_ports):
-            self.dut.egress_add_i[i].value = 0
+            self.dut.egress_addr_i[i].value = 0
             self.dut.egress_macro_select_i[i].value = 0
 
     async def reset(self):
@@ -65,7 +65,7 @@ class BufferPoolDriver:
         cover_byte_enable(be)
 
         self.dut.ingress_req_i[macro_idx].value = 1     
-        self.dut.ingress_add_i[macro_idx].value = addr
+        self.dut.ingress_addr_i[macro_idx].value = addr
         self.dut.ingress_wdata_i[macro_idx].value = data
         self.dut.ingress_be_i[macro_idx].value = be
         
@@ -85,7 +85,7 @@ class BufferPoolDriver:
         cover_address(addr)
 
         self.dut.egress_req_i[port_idx].value = 1
-        self.dut.egress_add_i[port_idx].value = addr
+        self.dut.egress_addr_i[port_idx].value = addr
         self.dut.egress_macro_select_i[port_idx].value = macro_idx
 
         await RisingEdge(self.dut.clk_i)
