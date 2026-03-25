@@ -1,0 +1,66 @@
+module fwft_fifo #(
+  parameter int DATA_WIDTH = 32,
+  parameter int DEPTH      = 8
+)(
+  input logic clk_i,
+  input logic rst_ni,
+
+  // Write
+  input  logic                  push_i,
+  input  logic [DATA_WIDTH-1:0] data_i,
+  output logic                  full_o,
+
+  // Read
+  input  logic                  pop_i,
+  output logic [DATA_WIDTH-1:0] data_o,
+  output logic                  empty_o
+);
+
+  logic [DATA_WIDTH-1:0]      mem [DEPTH];
+  logic [$clog2(DEPTH+1)-1:0] count_q;
+  logic [$clog2(DEPTH)-1:0]   wr_ptr_q, rd_ptr_q;
+
+  assign full_o  = (count_q == DEPTH);
+  assign empty_o = (count_q == 0);
+
+  assign data_o = mem[rd_ptr_q];
+
+  logic push, pop;
+
+  assign push = push_i && !full_o;
+  assign pop  = pop_i  && !empty_o;
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      count_q <= '0;
+      wr_ptr_q <= '0;
+      rd_ptr_q <= '0;
+    end else begin
+
+      case ({push, pop})
+        2'b11: begin
+          // Read and Write
+          mem[wr_ptr_q] <= data_i;
+          wr_ptr_q      <= (wr_ptr_q == DEPTH-1) ? '0 : wr_ptr_q + 1;
+          rd_ptr_q      <= (rd_ptr_q == DEPTH-1) ? '0 : rd_ptr_q + 1;
+        end
+        2'b10: begin
+          // Write
+          mem[wr_ptr_q] <= data_i;
+          wr_ptr_q      <= (wr_ptr_q == DEPTH-1) ? '0 : wr_ptr_q + 1;
+          count_q       <= count_q + 1;
+
+        end
+        2'b01: begin
+          // Read
+          rd_ptr_q <= (rd_ptr_q == DEPTH-1) ? '0 : rd_ptr_q + 1;
+          count_q <= count_q - 1; 
+        end
+        default: begin
+          ;
+        end
+      endcase
+    end
+  end
+
+endmodule

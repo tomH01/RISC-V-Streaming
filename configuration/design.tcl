@@ -72,6 +72,23 @@ $memory_simple addPythonSimFiles [list \
   "src/test/test_memory_simple.py" \
 ]
 
+
+
+# ------
+# Egress
+# ------
+
+set fwft_fifo [EDA::Design::createComponent fwft_fifo]
+
+$fwft_fifo addHDLSourceFiles [list \
+  "src/hdl/dma/egress/fwft_fifo.sv" \
+]
+
+$fwft_fifo addPythonSimFiles [list \
+  "src/test/dma/egress/test_fwft_fifo.py" \
+]
+
+
 # memory_macro
 set memory_macro [EDA::Design::createComponent memory_macro]
 $memory_macro addHDLSourceFiles [list \

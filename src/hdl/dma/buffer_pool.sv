@@ -10,16 +10,14 @@ module buffer_pool #(
 
   input logic [M_MACROS-1:0] macro_owner_i,
 
-  // ###############
-  // Ingress Channel
+  // Ingress IF
   input logic  [M_MACROS-1:0]   ingress_req_i,
   input logic  [ADDR_WIDTH-1:0] ingress_addr_i  [M_MACROS],
   input logic  [DATA_WIDTH-1:0] ingress_wdata_i [M_MACROS],
   input logic  [3:0]            ingress_be_i    [M_MACROS],
   output logic [M_MACROS-1:0]   ingress_gnt_o,
 
-  // ##############
-  // Egress Channel
+  // Egress IF
   input logic  [NB_READ_PORTS-1:0]    egress_req_i,
   input logic  [ADDR_WIDTH-1:0]       egress_addr_i         [NB_READ_PORTS],
   input logic  [$clog2(M_MACROS)-1:0] egress_macro_select_i [NB_READ_PORTS],
