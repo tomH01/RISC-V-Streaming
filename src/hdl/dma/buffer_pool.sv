@@ -3,7 +3,9 @@ module buffer_pool #(
   parameter int NB_READ_PORTS = 1,
   parameter int DATA_WIDTH    = 32,
   parameter int ADDR_WIDTH    = 32,
-  parameter int MACRO_DEPTH   = 256
+  parameter int MACRO_DEPTH   = 256,
+
+  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS)
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -20,7 +22,7 @@ module buffer_pool #(
   // Egress IF
   input logic  [NB_READ_PORTS-1:0]    egress_req_i,
   input logic  [ADDR_WIDTH-1:0]       egress_addr_i         [NB_READ_PORTS],
-  input logic  [$clog2(M_MACROS)-1:0] egress_macro_select_i [NB_READ_PORTS],
+  input logic  [MACRO_PTR_WIDTH-1:0]  egress_macro_select_i [NB_READ_PORTS],
   output logic [NB_READ_PORTS-1:0]    egress_gnt_o,
   output logic [NB_READ_PORTS-1:0]    egress_r_opc_o,
   output logic [DATA_WIDTH-1:0]       egress_r_rdata_o [NB_READ_PORTS],
@@ -38,7 +40,7 @@ module buffer_pool #(
      
   logic [M_MACROS-1:0]         demux_gnt;
 
-  logic [$clog2(M_MACROS)-1:0] egress_macro_select_q [NB_READ_PORTS];
+  logic [MACRO_PTR_WIDTH-1:0]  egress_macro_select_q [NB_READ_PORTS];
 
 
   always_ff @(posedge clk_i or negedge rst_ni) begin

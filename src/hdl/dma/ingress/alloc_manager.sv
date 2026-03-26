@@ -3,33 +3,34 @@ module alloc_manager #(
   parameter int M_MACROS    = 16,
   parameter int DATA_WIDTH  = 32,
   parameter int ADDR_WIDTH  = 32,
-  parameter int MACRO_DEPTH = 256
+  parameter int MACRO_DEPTH = 256,
 
+  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS)
 )(
   input logic clk_i,
   input logic rst_ni,
 
   // Control IF
-  input logic [N_STREAMS-1:0]                    cfg_stream_en_i,
-  input logic [$clog2(MACRO_DEPTH*M_MACROS)-1:0] cfg_window_size_i  [N_STREAMS],
-  input logic [$clog2(M_MACROS)-1:0]             cfg_start_macro_i  [N_STREAMS],
-  input logic [$clog2(M_MACROS)-1:0]             cfg_next_pointer_i [M_MACROS],
+  input logic [N_STREAMS-1:0]       cfg_stream_en_i,
+  input logic [DATA_WIDTH-1:0]      cfg_window_size_i  [N_STREAMS],
+  input logic [MACRO_PTR_WIDTH-1:0] cfg_start_macro_i  [N_STREAMS],
+  input logic [MACRO_PTR_WIDTH-1:0] cfg_next_pointer_i [M_MACROS],
 
   // Stream IF
   input logic [N_STREAMS-1:0]        stream_valid_i,
   input logic [N_STREAMS-1:0]        stream_gnt_i,
 
   // Ingress Crossbar IF
-  output logic [$clog2(M_MACROS)-1:0] am_macro_sel_o [N_STREAMS],
-  output logic [N_STREAMS-1:0]        am_req_o,
-  output logic [ADDR_WIDTH-1:0]       am_addr_o       [N_STREAMS],
+  output logic [MACRO_PTR_WIDTH-1:0] am_macro_sel_o [N_STREAMS],
+  output logic [N_STREAMS-1:0]       am_req_o,
+  output logic [ADDR_WIDTH-1:0]      am_addr_o       [N_STREAMS],
 
-  output logic [N_STREAMS-1:0]        window_valid_o,
-  output logic [$clog2(M_MACROS)-1:0] window_start_o [N_STREAMS]
+  output logic [N_STREAMS-1:0]       window_valid_o,
+  output logic [MACRO_PTR_WIDTH-1:0] window_start_o [N_STREAMS]
 );
 
-  logic [$clog2(M_MACROS)-1:0]             current_macro_q        [N_STREAMS];
-  logic [$clog2(M_MACROS)-1:0]             current_window_start_q [N_STREAMS];
+  logic [MACRO_PTR_WIDTH-1:0]              current_macro_q        [N_STREAMS];
+  logic [MACRO_PTR_WIDTH-1:0]              current_window_start_q [N_STREAMS];
   logic [$clog2(MACRO_DEPTH)-1:0]          macro_word_cnt_q       [N_STREAMS];
   logic [$clog2(MACRO_DEPTH*M_MACROS)-1:0] window_word_cnt_q      [N_STREAMS];
   logic [N_STREAMS-1:0]                    is_initialized_q;

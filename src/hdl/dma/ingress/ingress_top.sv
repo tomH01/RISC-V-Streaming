@@ -1,9 +1,11 @@
 module ingress_top #(
-  parameter int N_STREAMS  = 4,
-  parameter int M_MACROS   = 8,
-  parameter int DATA_WIDTH = 32,
+  parameter int N_STREAMS   = 4,
+  parameter int M_MACROS    = 8,
+  parameter int DATA_WIDTH  = 32,
   parameter int ADDR_WIDTH  = 32,
-  parameter int MACRO_DEPTH = 256
+  parameter int MACRO_DEPTH = 256,
+
+  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS)
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -21,14 +23,14 @@ module ingress_top #(
   output logic [3:0]            bp_be_o    [M_MACROS],
 
   // Control IF
-  input logic [N_STREAMS-1:0]                    cfg_stream_en_i,
-  input logic [$clog2(MACRO_DEPTH*M_MACROS)-1:0] cfg_window_size_i  [N_STREAMS],
-  input logic [$clog2(M_MACROS)-1:0]             cfg_start_macro_i  [N_STREAMS],
-  input logic [$clog2(M_MACROS)-1:0]             cfg_next_pointer_i [M_MACROS],
+  input logic [N_STREAMS-1:0]       cfg_stream_en_i,
+  input logic [DATA_WIDTH-1:0]      cfg_window_size_i  [N_STREAMS],
+  input logic [MACRO_PTR_WIDTH-1:0] cfg_start_macro_i  [N_STREAMS],
+  input logic [MACRO_PTR_WIDTH-1:0] cfg_next_pointer_i [M_MACROS],
 
   // Egress IF
-  output logic [N_STREAMS-1:0]        notify_valid_o,
-  output logic [$clog2(M_MACROS)-1:0] notify_start_macro_o [N_STREAMS]
+  output logic [N_STREAMS-1:0]       notify_valid_o,
+  output logic [MACRO_PTR_WIDTH-1:0] notify_start_macro_o [N_STREAMS]
 );
 
   // ############
@@ -63,7 +65,7 @@ module ingress_top #(
   // #############
   // Alloc Manager
 
-  logic [$clog2(M_MACROS)-1:0] am_macro_sel [N_STREAMS];
+  logic [MACRO_PTR_WIDTH-1:0] am_macro_sel [N_STREAMS];
   logic [ADDR_WIDTH-1:0]       am_addr       [N_STREAMS];
   logic [N_STREAMS-1:0]        am_req;
   

@@ -34,9 +34,43 @@ module job_manager #(
   logic [$clog2(M_MACROS)-1:0] notify_data  [N_STREAMS];
 
   // Config FIFOs
-  logic                  cfg_empty [N_STREAMS];
   logic                  cfg_pop   [N_STREAMS];
-  logic [DATA_WIDTH-1:0] cfg_data  [N_STREAMS];
+  logic [3*DATA_WIDTH-1:0] cfg_data  [N_STREAMS];
+  logic                  cfg_empty [N_STREAMS];
 
+  generate
+    for (genvar i = 0; i < N_STREAMS; i++) begin : gen_fifos
+      fwft_fifo #(
+        .DATA_WIDTH($clog2(M_MACROS)),
+        .DEPTH(4)
+      ) u_notify_fifo (
+        .clk_i(clk_i),
+        .rst_ni(rst_ni),
 
+        .push_i(notify_valid_i[i]),
+        .data_i(notify_start_macro_i[i]),
+        .full_o(),
+
+        .pop_i(notify_pop[i]),
+        .data_o(notify_data[i]),
+        .empty_o(notify_empty[i])
+      );
+
+      fwft_fifo #(
+        .DATA_WIDTH(3*DATA_WIDTH),
+        .DEPTH(8)
+      ) u_cfg_fifo (
+        .clk_i(clk_i),
+        .rst_ni(rst_ni),
+
+        .push_i(cfg_push_i[i]),
+        .data_i(cfg_wdata_i[i]),
+        .full_o(),
+
+        .pop_i(cfg_pop[i]),
+        .data_o(cfg_data[i]),
+        .empty_o(cfg_empty[i])
+      );
+    end
+  endgenerate
 endmodule
