@@ -6,6 +6,11 @@
 #
 #
 
+
+# -------
+# Ingress
+# -------
+
 set in_stream_channel [EDA::Design::createComponent in_stream_channel]
 
 $in_stream_channel addHDLSourceFiles [list \
@@ -87,6 +92,28 @@ $fwft_fifo addHDLSourceFiles [list \
 $fwft_fifo addPythonSimFiles [list \
   "src/test/dma/egress/test_fwft_fifo.py" \
 ]
+
+
+
+# ---
+# DMA
+# ---
+
+set control [EDA::Design::createComponent control]
+
+$control addHDLSourceFiles [list \
+  "src/hdl/dma/control.sv" \
+]
+
+$control addPythonSimFiles [list \
+  "src/test/dma/test_control.py" \
+]
+
+
+
+
+
+
 
 
 # memory_macro

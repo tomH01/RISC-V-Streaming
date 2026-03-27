@@ -4,6 +4,7 @@ module control #(
   parameter int NB_READ_PORTS = 1,
   parameter int DATA_WIDTH    = 32,
   parameter int ADDR_WIDTH    = 32,
+  parameter int MACRO_DEPTH   = 256,
 
   localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS)
 )(
@@ -22,9 +23,9 @@ module control #(
 
   // Ingress IF
   output logic [N_STREAMS-1:0]        stream_en_o,
-  output logic [ADDR_WIDTH-1:0]       window_size_o,
+  output logic [ADDR_WIDTH-1:0]       window_size_o  [N_STREAMS],
   output logic [MACRO_PTR_WIDTH-1:0]  start_macro_o  [N_STREAMS],
-  output logic [MACRO_PTR_WIDTH-1:0]  next_pointer_o [M_MACROS]
+  output logic [MACRO_PTR_WIDTH-1:0]  next_pointer_o [M_MACROS],
 
   // Egress IF
   output logic                    cfg_push_o  [N_STREAMS],
@@ -35,12 +36,16 @@ module control #(
   assign pready_o = 1'b1;
   assign pslverr_o = 1'b0;
 
-  logic [DATA_WIDTH-1:0] ingress_ctrl_q    [N_STREAMS];
-  logic [DATA_WIDTH-1:0] window_size_q     [N_STREAMS];
-  logic [DATA_WIDTH-1:0] egress_shadow_0_q [N_STREAMS];
-  logic [DATA_WIDTH-1:0] egress_shadow_1_q [N_STREAMS];
+  logic [MACRO_PTR_WIDTH-1:0] start_macro_q     [N_STREAMS];
+  logic [DATA_WIDTH-1:0]      window_size_q     [N_STREAMS];
+  logic [N_STREAMS-1:0]       stream_en_q;
+  logic [MACRO_PTR_WIDTH-1:0] next_pointer_q    [M_MACROS];
 
-  logic [MACRO_PTR_WIDTH-1:0] next_pointer_q [M_MACROS];
+  logic [DATA_WIDTH-1:0]      egress_shadow_0_q [N_STREAMS];
+  logic [DATA_WIDTH-1:0]      egress_shadow_1_q [N_STREAMS];
+
+  logic                    cfg_push_q  [N_STREAMS];
+  logic [3*DATA_WIDTH-1:0] cfg_wdata_q [N_STREAMS];
 
   logic [DATA_WIDTH-1:0] cq_base_addr_q [N_STREAMS];
   logic [DATA_WIDTH-1:0] cq_size_q      [N_STREAMS];
@@ -64,20 +69,24 @@ module control #(
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-      ingress_ctrl_q    <= '(default: '0);
-      window_size_q     <= '(default: '0);
-      egress_shadow_0_q <= '(default: '0);
-      egress_shadow_1_q <= '(default: '0);
-      cq_base_addr_q    <= '(default: '0);
-      cq_size_q         <= '(default: '0);
+      start_macro_q     <= '{default: '0};
+      window_size_q     <= '{default: '0};
+      stream_en_q       <= '{default: '0};
+      egress_shadow_0_q <= '{default: '0};
+      egress_shadow_1_q <= '{default: '0};
+      cfg_push_q        <= '{default: '0};
+      cfg_wdata_q       <= '{default: '0};
+      cq_base_addr_q    <= '{default: '0};
+      cq_size_q         <= '{default: '0};
 
-      next_pointer_q <= '(default: '0);
+      next_pointer_q <= '{default: '0};
     end else if (wr_en) begin
       // Stream Configurations
       if (is_stream_cfg && (stream_idx < N_STREAMS)) begin
         case (stream_offset)
-          6'h00: ingress_ctrl_q[stream_idx]    <= pwdata_i;
+          6'h00: start_macro_q[stream_idx]     <= MACRO_PTR_WIDTH'(pwdata_i);
           6'h04: window_size_q[stream_idx]     <= pwdata_i;
+          6'h08: stream_en_q[stream_idx]       <= pwdata_i[0];
           6'h10: egress_shadow_0_q[stream_idx] <= pwdata_i; 
           6'h14: egress_shadow_1_q[stream_idx] <= pwdata_i;
 
@@ -86,6 +95,13 @@ module control #(
 
           default: ;
         endcase
+
+        if (stream_offset == 6'h18) begin
+          cfg_push_q[stream_idx]  <= 1'b1;
+          cfg_wdata_q[stream_idx] <= {pwdata_i, egress_shadow_1_q[stream_idx], egress_shadow_0_q[stream_idx]};
+        end else begin
+          cfg_push_q[stream_idx] <= 1'b0;
+        end
       end
 
       // Topology Configuration
@@ -100,20 +116,12 @@ module control #(
     end
   end
 
-  generate
-    for (genvar i = 0; i < N_STREAMS; i++) begin
-      assign stream_en_o[i]   = ingress_ctrl_q[i][0];
-      assign start_macro_o[i] = MACRO_PTR_WIDTH'(ingress_ctrl_q[i][31:16]);
-      assign window_size_o[i] = window_size_q[i];
+  assign stream_en_o = stream_en_q;
+  assign start_macro_o = start_macro_q;
+  assign window_size_o = window_size_q;
+  assign next_pointer_o = next_pointer_q;
 
-      assign cfg_push_o[i] = wr_en & is_stream_cfg & (stream_idx == i) & (stream_offset == 6'h18);
-
-      assign cfg_wdata_o[i] = {pwdata_i, egress_shadow_1_q[i], egress_shadow_0_q[i]};
-
-      for (genvar m = 0; m < M_MACROS; m++) begin
-        assign next_pointer_o[m] = next_pointer_q[m][MACRO_PTR_WIDTH-1:0];
-      end 
-    end
-  endgenerate
+  assign cfg_push_o = cfg_push_q;
+  assign cfg_wdata_o = cfg_wdata_q;
 
 endmodule
