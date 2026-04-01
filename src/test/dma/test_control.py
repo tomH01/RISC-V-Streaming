@@ -206,11 +206,11 @@ async def test_egress_control(dut):
     
     await driver.reset()
     
-    config = {i: [0, 0, 0] for i in range(n_streams)}
+    config = {i: [0, 0, 0, 0] for i in range(n_streams)}
     
     NUM_CYCLES = 1000
     for _ in range(NUM_CYCLES):
-        idx = rnd.randint(0, 2)
+        idx = rnd.randint(0, 3)
         stream_id = rnd.randint(0, n_streams - 1)
         rand_value = rnd.getrandbits(32)
         config[stream_id][idx] = rand_value
@@ -218,10 +218,11 @@ async def test_egress_control(dut):
         await driver.send_egress_config(stream_id, idx, rand_value)
         await ReadOnly()
         
-        if idx == 2:            
+        if idx == 3:            
             assert int(dut.cfg_push_o[stream_id].value) == 1, f"Expected push signal to be asserted for stream {stream_id}, got: {dut.cfg_push_o[stream_id].value}"
-            expected_wdata = int((config[stream_id][2] << 64) | (config[stream_id][1] << 32) | config[stream_id][0])
+            expected_wdata = int((config[stream_id][0] << 96) | (config[stream_id][1] << 64) | (config[stream_id][2] << 32) | config[stream_id][3])
             assert int(dut.cfg_wdata_o[stream_id].value) == expected_wdata, f"Expected wdata: {expected_wdata}, got: {int(dut.cfg_wdata_o[stream_id].value)}"
         else:
             assert int(dut.cfg_push_o[stream_id].value) == 0, f"Expected push signal to be deasserted for stream {stream_id}, got: {dut.cfg_push_o[stream_id].value}"
         await FallingEdge(dut.clk_i)
+        

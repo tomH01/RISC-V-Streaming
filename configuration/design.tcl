@@ -7,6 +7,7 @@
 #
 
 
+
 # -------
 # Ingress
 # -------
@@ -91,6 +92,17 @@ $fwft_fifo addHDLSourceFiles [list \
 
 $fwft_fifo addPythonSimFiles [list \
   "src/test/dma/egress/test_fwft_fifo.py" \
+]
+
+
+set rr_arbiter [EDA::Design::createComponent rr_arbiter]
+
+$rr_arbiter addHDLSourceFiles [list \
+  "src/hdl/dma/egress/rr_arbiter.sv" \
+]
+
+$rr_arbiter addPythonSimFiles [list \
+  "src/test/dma/egress/test_rr_arbiter.py" \
 ]
 
 

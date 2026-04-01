@@ -29,8 +29,9 @@ module control #(
 
   // Egress IF
   output logic                    cfg_push_o  [N_STREAMS],
-  output logic [3*DATA_WIDTH-1:0] cfg_wdata_o [N_STREAMS]
+  output logic [4*DATA_WIDTH-1:0] cfg_wdata_o [N_STREAMS]
 );
+
   logic wr_en;
   assign wr_en = psel_i & penable_i & pwrite_i;
   assign pready_o = 1'b1;
@@ -43,9 +44,10 @@ module control #(
 
   logic [DATA_WIDTH-1:0]      egress_shadow_0_q [N_STREAMS];
   logic [DATA_WIDTH-1:0]      egress_shadow_1_q [N_STREAMS];
+  logic [DATA_WIDTH-1:0]      egress_shadow_2_q [N_STREAMS];
 
   logic                    cfg_push_q  [N_STREAMS];
-  logic [3*DATA_WIDTH-1:0] cfg_wdata_q [N_STREAMS];
+  logic [4*DATA_WIDTH-1:0] cfg_wdata_q [N_STREAMS];
 
   logic [DATA_WIDTH-1:0] cq_base_addr_q [N_STREAMS];
   logic [DATA_WIDTH-1:0] cq_size_q      [N_STREAMS];
@@ -74,6 +76,7 @@ module control #(
       stream_en_q       <= '{default: '0};
       egress_shadow_0_q <= '{default: '0};
       egress_shadow_1_q <= '{default: '0};
+      egress_shadow_2_q <= '{default: '0};
       cfg_push_q        <= '{default: '0};
       cfg_wdata_q       <= '{default: '0};
       cq_base_addr_q    <= '{default: '0};
@@ -89,6 +92,7 @@ module control #(
           6'h08: stream_en_q[stream_idx]       <= pwdata_i[0];
           6'h10: egress_shadow_0_q[stream_idx] <= pwdata_i; 
           6'h14: egress_shadow_1_q[stream_idx] <= pwdata_i;
+          6'h18: egress_shadow_2_q[stream_idx] <= pwdata_i;
 
           6'h20: cq_base_addr_q[stream_idx] <= pwdata_i;
           6'h24: cq_size_q[stream_idx]      <= pwdata_i;
@@ -96,9 +100,9 @@ module control #(
           default: ;
         endcase
 
-        if (stream_offset == 6'h18) begin
+        if (stream_offset == 6'h1C) begin
           cfg_push_q[stream_idx]  <= 1'b1;
-          cfg_wdata_q[stream_idx] <= {pwdata_i, egress_shadow_1_q[stream_idx], egress_shadow_0_q[stream_idx]};
+          cfg_wdata_q[stream_idx] <= {egress_shadow_0_q[stream_idx], egress_shadow_1_q[stream_idx], egress_shadow_2_q[stream_idx], pwdata_i};
         end else begin
           cfg_push_q[stream_idx] <= 1'b0;
         end
