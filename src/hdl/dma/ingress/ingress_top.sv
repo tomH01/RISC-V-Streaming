@@ -43,19 +43,19 @@ module ingress_top #(
   generate
     for (genvar i = 0; i < N_STREAMS; i++) begin : gen_in_stream_channels
       
-      in_stream_channel #(
+      skid_buffer #(
         .DATA_WIDTH(DATA_WIDTH)
       ) u_in_stream_channel (
         .clk_i(clk_i),
         .rst_ni(rst_ni),
 
-        .data_i(stream_data_i[i]),
-        .valid_i(stream_valid_i[i]),
-        .ready_o(stream_ready_o[i]),
+        .us_data_i(stream_data_i[i]),
+        .us_valid_i(stream_valid_i[i]),
+        .us_ready_o(stream_ready_o[i]),
 
-        .data_o(ch_data[i]),
-        .valid_o(ch_valid[i]),
-        .ready_i(ch_ready[i])
+        .ds_data_o(ch_data[i]),
+        .ds_valid_o(ch_valid[i]),
+        .ds_ready_i(ch_ready[i])
       );
 
     end
@@ -65,7 +65,7 @@ module ingress_top #(
   // #############
   // Alloc Manager
 
-  logic [MACRO_PTR_WIDTH-1:0] am_macro_sel [N_STREAMS];
+  logic [MACRO_PTR_WIDTH-1:0]  am_macro_sel  [N_STREAMS];
   logic [ADDR_WIDTH-1:0]       am_addr       [N_STREAMS];
   logic [N_STREAMS-1:0]        am_req;
   

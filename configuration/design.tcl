@@ -8,20 +8,47 @@
 
 
 
+# ------
+# Common
+# ------
+
+set skid_buffer [EDA::Design::createComponent skid_buffer]
+
+$skid_buffer addHDLSourceFiles [list \
+  "src/hdl/common/flow_control/skid_buffer.sv" 
+]
+
+$skid_buffer addPythonSimFiles [list \
+  "src/test/common/flow_control/test_skid_buffer.py" \
+]
+
+
+set fwft_fifo [EDA::Design::createComponent fwft_fifo]
+
+$fwft_fifo addHDLSourceFiles [list \
+  "src/hdl/common/mem/fwft_fifo.sv" \
+]
+
+$fwft_fifo addPythonSimFiles [list \
+  "src/test/common/mem/test_fwft_fifo.py" \
+]
+
+
+set rr_arbiter [EDA::Design::createComponent rr_arbiter]
+
+$rr_arbiter addHDLSourceFiles [list \
+  "src/hdl/common/arb/rr_arbiter.sv" \
+]
+
+$rr_arbiter addPythonSimFiles [list \
+  "src/test/common/arb/test_rr_arbiter.py" \
+]
+
+
+
 # -------
 # Ingress
 # -------
-
-set in_stream_channel [EDA::Design::createComponent in_stream_channel]
-
-$in_stream_channel addHDLSourceFiles [list \
-  "src/hdl/dma/ingress/in_stream_channel.sv" 
-]
-
-$in_stream_channel addPythonSimFiles [list \
-  "src/test/dma/ingress/test_in_stream_channel.py" \
-]
-
 
 set buffer_pool [EDA::Design::createComponent buffer_pool]
 
@@ -57,7 +84,7 @@ set ingress_top [EDA::Design::createComponent ingress_top]
 
 $ingress_top addHDLSourceFiles [list \
   "src/hdl/dma/ingress/ingress_top.sv" \
-  "src/hdl/dma/ingress/in_stream_channel.sv" \
+  "src/hdl/common/flow_control/skid_buffer.sv" \
   "src/hdl/dma/ingress/ingress_crossbar.sv" \
   "src/hdl/dma/ingress/alloc_manager.sv" \
 ]
@@ -84,25 +111,16 @@ $memory_simple addPythonSimFiles [list \
 # Egress
 # ------
 
-set fwft_fifo [EDA::Design::createComponent fwft_fifo]
+set job_manager [EDA::Design::createComponent job_manager]
 
-$fwft_fifo addHDLSourceFiles [list \
+$job_manager addHDLSourceFiles [list \
+  "src/hdl/dma/egress/job_manager.sv" \
   "src/hdl/dma/egress/fwft_fifo.sv" \
-]
-
-$fwft_fifo addPythonSimFiles [list \
-  "src/test/dma/egress/test_fwft_fifo.py" \
-]
-
-
-set rr_arbiter [EDA::Design::createComponent rr_arbiter]
-
-$rr_arbiter addHDLSourceFiles [list \
   "src/hdl/dma/egress/rr_arbiter.sv" \
 ]
 
-$rr_arbiter addPythonSimFiles [list \
-  "src/test/dma/egress/test_rr_arbiter.py" \
+$job_manager addPythonSimFiles [list \
+  "src/test/dma/egress/test_job_manager.py" \
 ]
 
 
@@ -120,12 +138,6 @@ $control addHDLSourceFiles [list \
 $control addPythonSimFiles [list \
   "src/test/dma/test_control.py" \
 ]
-
-
-
-
-
-
 
 
 # memory_macro

@@ -22,4 +22,44 @@ module ingress_top #(
   output logic [$clog2(M_MACROS)-1:0] bp_macro_select_o [NB_READ_PORTS],
 );
 
+  // ############
+  // Job Manager
+
+  
+
+  job_manager #(
+    .N_STREAMS(N_STREAMS),
+    .M_MACROS(M_MACROS),
+    .NB_READ_PORTS(NB_READ_PORTS),
+    .DATA_WIDTH(DATA_WIDTH),
+    .ADDR_WIDTH(ADDR_WIDTH)
+  ) u_job_manager (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+
+    .notify_valid_i(notify_valid_i),
+    .notify_start_macro_i(notify_start_macro_i),
+
+    .job_ready_i(),
+    .job_fire_o(),
+
+    .job_stream_id_o(),
+    .job_start_macro_o(),
+    .job_window_size_o(),
+    .job_window_id_o(),
+
+    .stride_x_o(),
+    .count_x_o(),
+    .stride_y_o(),
+    .count_y_o(),
+    .stride_z_o(),
+    .count_z_o()
+  );
+
+
+
+  // ############
+  // A Address Generators
+
+
 endmodule

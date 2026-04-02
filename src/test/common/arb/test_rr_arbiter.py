@@ -5,7 +5,7 @@ from cocotb.triggers import ClockCycles, FallingEdge, ReadOnly, RisingEdge
 from cocotb.clock import Clock
 
 
-class GoldenModel:
+class RRGoldenModel:
     def __init__(self, n):
         self.n = n
         self.pointer = 0
@@ -28,7 +28,7 @@ class GoldenModel:
 async def test_rr_arbiter(dut):
     n = int(dut.N.value)
     rnd.seed(42)
-    golden_model = GoldenModel(n)
+    golden_model = RRGoldenModel(n)
     
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
     
