@@ -5,14 +5,14 @@ module skid_buffer #(
   input logic rst_ni,
 
   // Upstream IF
-  input  logic [DATA_WIDTH-1:0] us_data_i,
   input  logic                  us_valid_i,
+  input  logic [DATA_WIDTH-1:0] us_data_i,
   output logic                  us_ready_o,
 
   // Downstream IF
   input  logic                  ds_ready_i,
-  output logic [DATA_WIDTH-1:0] ds_data_o,
-  output logic                  ds_valid_o
+  output logic                  ds_valid_o,
+  output logic [DATA_WIDTH-1:0] ds_data_o
 );
   logic [DATA_WIDTH-1:0] data_q;
   logic                  data_valid_q;

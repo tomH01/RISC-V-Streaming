@@ -11,8 +11,8 @@ module ingress_top #(
   input logic rst_ni,
 
   // Stream IF
-  input logic [DATA_WIDTH-1:0] stream_data_i  [N_STREAMS],
   input logic                  stream_valid_i [N_STREAMS],
+  input logic [DATA_WIDTH-1:0] stream_data_i  [N_STREAMS],
   output logic                 stream_ready_o [N_STREAMS],
 
   // Buffer Pool IF
@@ -49,13 +49,13 @@ module ingress_top #(
         .clk_i(clk_i),
         .rst_ni(rst_ni),
 
-        .us_data_i(stream_data_i[i]),
         .us_valid_i(stream_valid_i[i]),
+        .us_data_i(stream_data_i[i]),
         .us_ready_o(stream_ready_o[i]),
 
-        .ds_data_o(ch_data[i]),
+        .ds_ready_i(ch_ready[i]),
         .ds_valid_o(ch_valid[i]),
-        .ds_ready_i(ch_ready[i])
+        .ds_data_o(ch_data[i])
       );
 
     end

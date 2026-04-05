@@ -29,24 +29,25 @@ module job_manager #(
   output logic [MACRO_PTR_WIDTH-1:0]  job_start_macro_o,
   output logic [ADDR_WIDTH-1:0]       job_window_size_o, 
   output logic [15:0]                 job_window_id_o,
-
-  output logic [15:0] stride_x_o,
-  output logic [15:0] count_x_o,
-  output logic [15:0] stride_y_o,
-  output logic [15:0] count_y_o,
-  output logic [15:0] stride_z_o,
-  output logic [15:0] count_z_o
+  output logic [3:0]                  job_mode_o,
+  output logic [95:0]                 job_payload_o
 );
+
   typedef struct packed {
-    logic [15:0] stride_x;
-    logic [15:0] count_x;
-    logic [15:0] stride_y;
-    logic [15:0] count_y;
-    logic [15:0] stride_z;
-    logic [15:0] count_z;
-    logic [15:0] apply_count;
+    logic [3:0]  mode;
+    logic [11:0] apply_count;
     logic [15:0] window_id;
+    logic [95:0] payload;
   } cfg_t;
+
+  typedef struct packed {
+    logic [STREAM_PTR_WIDTH-1:0] stream_id;
+    logic [MACRO_PTR_WIDTH-1:0]  start_macro;
+    logic [ADDR_WIDTH-1:0]       window_size;
+    logic [15:0]                 window_id;
+    logic [3:0]                  mode;
+    logic [95:0]                 payload;
+  } job_pkt_t;
 
   // Notification FIFOs
   logic                       notif_empty [N_STREAMS];
@@ -63,6 +64,11 @@ module job_manager #(
   logic [15:0]          apply_counter_q [N_STREAMS];
   logic [N_STREAMS-1:0] cfg_active;
 
+  // Skid 
+  job_pkt_t us_job_data;
+  logic     us_job_valid;
+  logic     us_job_ready;
+
   // Arbiter
   logic [N_STREAMS-1:0] stream_ready_vec;
   logic [N_STREAMS-1:0] stream_gnt_vec;
@@ -74,7 +80,7 @@ module job_manager #(
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
-    .req_i(job_ready_i),
+    .req_i(us_job_ready),
     .ready_i(stream_ready_vec),
     .gnt_o(stream_gnt_vec),
     .valid_o(arb_valid)
@@ -86,7 +92,9 @@ module job_manager #(
       assign stream_ready_vec[i] = ~notif_empty[i];
       assign notif_pop[i]        = stream_gnt_vec[i] & arb_valid;
 
-      assign cfg_active[i] = (apply_counter_q[i] < current_cfg_q[i].apply_count);
+      // Apply count 0 means always active
+      assign cfg_active[i] = (current_cfg_q[i].apply_count == '0) || 
+                             (apply_counter_q[i] < current_cfg_q[i].apply_count);
 
       fwft_fifo #(
         .DATA_WIDTH(MACRO_PTR_WIDTH),
@@ -132,16 +140,16 @@ module job_manager #(
 
       always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
-          current_cfg_q[i] <= '0;
+          current_cfg_q[i]   <= '0;
           apply_counter_q[i] <= '0;
         end else begin
 
           if (cfg_pop[i] && cfg_data[i].window_id == current_cfg_q[i].window_id) begin
-            current_cfg_q[i] <= cfg_data[i];
+            current_cfg_q[i]   <= cfg_data[i];
             apply_counter_q[i] <= 16'h0;
           end
           if (stream_gnt_vec[i] && arb_valid) begin
-            apply_counter_q[i] <= apply_counter_q[i] + 1;
+            apply_counter_q[i]         <= apply_counter_q[i] + 1;
             current_cfg_q[i].window_id <= current_cfg_q[i].window_id + 1;
           end
         end
@@ -150,43 +158,47 @@ module job_manager #(
   endgenerate
 
   always_comb begin
-    job_fire_o        = arb_valid;
-    job_stream_id_o   = '0;
-    job_start_macro_o = '0;
-    job_window_size_o = '0;
-    job_window_id_o   = '0;
-
-    stride_x_o = '0;
-    count_x_o  = '0;
-    stride_y_o = '0;
-    count_y_o  = '0;
-    stride_z_o = '0;
-    count_z_o  = '0;
+    us_job_valid = arb_valid;
+    us_job_data  = '0;
 
     for (int i = 0; i < N_STREAMS; i++) begin
       if (stream_gnt_vec[i] && arb_valid) begin
-        job_stream_id_o   = STREAM_PTR_WIDTH'(i);
-        job_start_macro_o = notif_data[i];
-        job_window_size_o = window_size_i[i];
-        job_window_id_o   = current_cfg_q[i].window_id;
+        us_job_data.stream_id   = STREAM_PTR_WIDTH'(i);
+        us_job_data.start_macro = notif_data[i];
+        us_job_data.window_size = window_size_i[i];
+        us_job_data.window_id   = current_cfg_q[i].window_id;
 
         if (cfg_active[i]) begin
-          stride_x_o = current_cfg_q[i].stride_x;
-          count_x_o  = current_cfg_q[i].count_x;
-          stride_y_o = current_cfg_q[i].stride_y;
-          count_y_o  = current_cfg_q[i].count_y;
-          stride_z_o = current_cfg_q[i].stride_z;
-          count_z_o  = current_cfg_q[i].count_z;
+          us_job_data.mode    = current_cfg_q[i].mode;
+          us_job_data.payload = current_cfg_q[i].payload;
         end else begin
-          stride_x_o = 16'h1;
-          count_x_o  = window_size_i[i][15:0];
-          stride_y_o = 16'h0;
-          count_y_o  = 16'h1;
-          stride_z_o = 16'h0;
-          count_z_o  = 16'h1;
+          us_job_data.mode    = '0; // Linear Mode
+          us_job_data.payload = '0;
         end
       end
     end
   end
+
+  skid_buffer #(
+    .DATA_WIDTH($bits(job_pkt_t))
+  ) u_job_skid (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+
+    .us_valid_i(us_job_valid),
+    .us_data_i(us_job_data),
+    .us_ready_o(us_job_ready),
+
+    .ds_ready_i(job_ready_i),
+    .ds_valid_o(job_fire_o),
+    .ds_data_o({
+      job_stream_id_o,
+      job_start_macro_o,
+      job_window_size_o,
+      job_window_id_o,
+      job_mode_o,
+      job_payload_o
+    })
+  );
 
 endmodule
