@@ -10,9 +10,7 @@ class RRGoldenModel:
         self.n = n
         self.pointer = 0
         
-    def step(self, ready_i, req_i):
-        ready = [bool(ready_i & (1 << i)) for i in range(self.n)]
-        
+    def step(self, ready, req_i):
         if int(req_i) == 0 or not any(ready):
             return None
         
@@ -52,7 +50,8 @@ async def test_rr_arbiter(dut):
         
         dut.req_i.value = req_val
             
-        expected = golden_model.step(ready_val, req_val)
+        ready = [bool(ready_val & (1 << i)) for i in range(n)]
+        expected = golden_model.step(ready, req_val)
         
         await ReadOnly()
         

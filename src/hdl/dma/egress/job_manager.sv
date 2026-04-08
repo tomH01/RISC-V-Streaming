@@ -4,6 +4,7 @@ module job_manager #(
   parameter int NB_READ_PORTS = 1,
   parameter int DATA_WIDTH    = 32,
   parameter int ADDR_WIDTH    = 32,
+  parameter int FIFO_DEPTH    = 8,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS)
@@ -23,13 +24,13 @@ module job_manager #(
 
   // Job IF
   input  logic job_ready_i,
-  output logic job_fire_o,
+  output logic job_valid_o,
 
   output logic [STREAM_PTR_WIDTH-1:0] job_stream_id_o,
   output logic [MACRO_PTR_WIDTH-1:0]  job_start_macro_o,
   output logic [ADDR_WIDTH-1:0]       job_window_size_o, 
-  output logic [15:0]                 job_window_id_o,
   output logic [3:0]                  job_mode_o,
+  output logic [15:0]                 job_window_id_o,
   output logic [95:0]                 job_payload_o
 );
 
@@ -44,8 +45,8 @@ module job_manager #(
     logic [STREAM_PTR_WIDTH-1:0] stream_id;
     logic [MACRO_PTR_WIDTH-1:0]  start_macro;
     logic [ADDR_WIDTH-1:0]       window_size;
-    logic [15:0]                 window_id;
     logic [3:0]                  mode;
+    logic [15:0]                 window_id;
     logic [95:0]                 payload;
   } job_pkt_t;
 
@@ -62,7 +63,10 @@ module job_manager #(
   // Current Config
   cfg_t                 current_cfg_q   [N_STREAMS];
   logic [15:0]          apply_counter_q [N_STREAMS];
-  logic [N_STREAMS-1:0] cfg_active;
+
+  cfg_t                 effective_cfg [N_STREAMS];
+  logic [N_STREAMS-1:0] effective_active;
+  logic [N_STREAMS-1:0] load_new_cfg;
 
   // Skid 
   job_pkt_t us_job_data;
@@ -92,13 +96,9 @@ module job_manager #(
       assign stream_ready_vec[i] = ~notif_empty[i];
       assign notif_pop[i]        = stream_gnt_vec[i] & arb_valid;
 
-      // Apply count 0 means always active
-      assign cfg_active[i] = (current_cfg_q[i].apply_count == '0) || 
-                             (apply_counter_q[i] < current_cfg_q[i].apply_count);
-
       fwft_fifo #(
         .DATA_WIDTH(MACRO_PTR_WIDTH),
-        .DEPTH(8)
+        .DEPTH(FIFO_DEPTH)
       ) u_notif_fifo (
         .clk_i(clk_i),
         .rst_ni(rst_ni),
@@ -114,7 +114,7 @@ module job_manager #(
 
       fwft_fifo #(
         .DATA_WIDTH(4*DATA_WIDTH),
-        .DEPTH(8)
+        .DEPTH(FIFO_DEPTH)
       ) u_cfg_fifo (
         .clk_i(clk_i),
         .rst_ni(rst_ni),
@@ -128,6 +128,7 @@ module job_manager #(
         .empty_o(cfg_empty[i])
       );
 
+      // Pop logic
       always_comb begin
         cfg_pop[i] = 1'b0;
 
@@ -138,20 +139,40 @@ module job_manager #(
         end
       end
 
+      assign load_new_cfg[i] = cfg_pop[i] && (cfg_data[i].window_id == current_cfg_q[i].window_id);
+
+      always_comb begin
+        if (load_new_cfg[i]) begin
+          effective_cfg[i]    = cfg_data[i];
+          effective_active[i] = 1'b1; 
+        end else begin
+          effective_cfg[i] = current_cfg_q[i];
+          effective_active[i] = (current_cfg_q[i].apply_count == '0) || 
+                                (apply_counter_q[i] < current_cfg_q[i].apply_count);
+        end
+      end
+
       always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
           current_cfg_q[i]   <= '0;
           apply_counter_q[i] <= '0;
         end else begin
 
-          if (cfg_pop[i] && cfg_data[i].window_id == current_cfg_q[i].window_id) begin
+          if (load_new_cfg[i]) begin
             current_cfg_q[i]   <= cfg_data[i];
-            apply_counter_q[i] <= 16'h0;
-          end
-          if (stream_gnt_vec[i] && arb_valid) begin
-            apply_counter_q[i]         <= apply_counter_q[i] + 1;
+
+            if (stream_gnt_vec[i] && arb_valid) begin
+              apply_counter_q[i]         <= 16'h1; 
+              current_cfg_q[i].window_id <= cfg_data[i].window_id + 1;
+            end else begin
+              apply_counter_q[i] <= 16'h0;
+            end
+
+          end else if (stream_gnt_vec[i] && arb_valid) begin
+            apply_counter_q[i] <= apply_counter_q[i] + 1;
             current_cfg_q[i].window_id <= current_cfg_q[i].window_id + 1;
           end
+
         end
       end
     end
@@ -168,9 +189,9 @@ module job_manager #(
         us_job_data.window_size = window_size_i[i];
         us_job_data.window_id   = current_cfg_q[i].window_id;
 
-        if (cfg_active[i]) begin
-          us_job_data.mode    = current_cfg_q[i].mode;
-          us_job_data.payload = current_cfg_q[i].payload;
+        if (effective_active[i]) begin
+          us_job_data.mode    = effective_cfg[i].mode;
+          us_job_data.payload = effective_cfg[i].payload;
         end else begin
           us_job_data.mode    = '0; // Linear Mode
           us_job_data.payload = '0;
@@ -190,13 +211,13 @@ module job_manager #(
     .us_ready_o(us_job_ready),
 
     .ds_ready_i(job_ready_i),
-    .ds_valid_o(job_fire_o),
+    .ds_valid_o(job_valid_o),
     .ds_data_o({
       job_stream_id_o,
       job_start_macro_o,
       job_window_size_o,
-      job_window_id_o,
       job_mode_o,
+      job_window_id_o,
       job_payload_o
     })
   );

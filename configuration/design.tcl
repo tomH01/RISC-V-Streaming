@@ -115,8 +115,9 @@ set job_manager [EDA::Design::createComponent job_manager]
 
 $job_manager addHDLSourceFiles [list \
   "src/hdl/dma/egress/job_manager.sv" \
-  "src/hdl/dma/egress/fwft_fifo.sv" \
-  "src/hdl/dma/egress/rr_arbiter.sv" \
+  "src/hdl/common/mem/fwft_fifo.sv" \
+  "src/hdl/common/arb/rr_arbiter.sv" \
+  "src/hdl/common/flow_control/skid_buffer.sv" \
 ]
 
 $job_manager addPythonSimFiles [list \
