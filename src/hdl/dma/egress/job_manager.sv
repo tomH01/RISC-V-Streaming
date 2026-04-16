@@ -1,7 +1,6 @@
 module job_manager #(
   parameter int N_STREAMS     = 4,
   parameter int M_MACROS      = 8,
-  parameter int NB_READ_PORTS = 1,
   parameter int DATA_WIDTH    = 32,
   parameter int ADDR_WIDTH    = 32,
   parameter int FIFO_DEPTH    = 8,
@@ -23,15 +22,7 @@ module job_manager #(
   input logic [ADDR_WIDTH-1:0]   window_size_i [N_STREAMS],
 
   // Job IF
-  input  logic job_ready_i,
-  output logic job_valid_o,
-
-  output logic [STREAM_PTR_WIDTH-1:0] job_stream_id_o,
-  output logic [MACRO_PTR_WIDTH-1:0]  job_start_macro_o,
-  output logic [ADDR_WIDTH-1:0]       job_window_size_o, 
-  output logic [3:0]                  job_mode_o,
-  output logic [15:0]                 job_window_id_o,
-  output logic [95:0]                 job_payload_o
+  job_if.manager job_o
 );
 
   typedef struct packed {
@@ -41,14 +32,7 @@ module job_manager #(
     logic [95:0] payload;
   } cfg_t;
 
-  typedef struct packed {
-    logic [STREAM_PTR_WIDTH-1:0] stream_id;
-    logic [MACRO_PTR_WIDTH-1:0]  start_macro;
-    logic [ADDR_WIDTH-1:0]       window_size;
-    logic [3:0]                  mode;
-    logic [15:0]                 window_id;
-    logic [95:0]                 payload;
-  } job_pkt_t;
+  typedef job_o.job_pkt_t job_pkt_t;
 
   // Notification FIFOs
   logic                       notif_empty [N_STREAMS];
@@ -210,16 +194,9 @@ module job_manager #(
     .us_data_i(us_job_data),
     .us_ready_o(us_job_ready),
 
-    .ds_ready_i(job_ready_i),
-    .ds_valid_o(job_valid_o),
-    .ds_data_o({
-      job_stream_id_o,
-      job_start_macro_o,
-      job_window_size_o,
-      job_mode_o,
-      job_window_id_o,
-      job_payload_o
-    })
+    .ds_ready_i(job_o.ready),
+    .ds_valid_o(job_o.valid),
+    .ds_data_o(job_o.pkt)
   );
 
 endmodule

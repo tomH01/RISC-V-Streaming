@@ -95,9 +95,9 @@ class GoldenModel:
                         st['current_cfg'] = cfg
                         st['apply_counter'] = 0
             
-            gnt_val = self.dut.u_stream_arbiter.gnt_o.value.integer
-            arb_valid = self.dut.u_stream_arbiter.valid_o.value.integer
-            us_ready = self.dut.us_job_ready.value.integer
+            gnt_val = self.dut.dut.u_stream_arbiter.gnt_o.value.integer
+            arb_valid = self.dut.dut.u_stream_arbiter.valid_o.value.integer
+            us_ready = self.dut.dut.us_job_ready.value.integer
             
             if arb_valid and us_ready and gnt_val > 0:
                 grant_id = int(math.log2(gnt_val))
@@ -230,7 +230,7 @@ async def test_job_manager_crv(dut):
             for stream_id in range(n_streams):
                 st = golden_model.state[stream_id]
 
-                if rnd.random() < 0.2 and len(st['notif_fifo']) < golden_model.fifo_depth:
+                if rnd.random() < 0.4 and len(st['notif_fifo']) < golden_model.fifo_depth:
                     start_macro = rnd.randint(0, dut.M_MACROS.value - 1)
                     await driver.send_notification(stream_id, start_macro)
                     
@@ -261,7 +261,7 @@ async def test_job_manager_crv(dut):
         while True:
             await RisingEdge(dut.clk_i)
             if int(dut.job_valid_o.value) == 0 and \
-               int(dut.us_job_valid.value) == 0:
+               int(dut.dut.us_job_valid.value) == 0:
                 await ClockCycles(dut.clk_i, 2)
                 break
             
