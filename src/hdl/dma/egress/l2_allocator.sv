@@ -67,7 +67,7 @@ module l2_allocator #(
 
   // Job Dispatch Logic
   logic [DATA_WIDTH-1:0] current_job_size;
-  assign current_job_size = DATA_WIDTH'(job_req_i.pkt.window_size);
+  assign current_job_size = DATA_WIDTH'(job_req_i.pkt.window_size << 2);
 
   logic fits_in_current_bank;
   assign fits_in_current_bank = (bank_offset_q + bank_header_size_b_i + current_job_size) <= bank_limit_b_i;

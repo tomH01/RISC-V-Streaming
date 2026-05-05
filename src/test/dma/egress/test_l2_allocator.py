@@ -35,6 +35,8 @@ class L2AllocatorDriver:
         self.dut.worker_done_i.value = 0
 
     async def reset(self):
+        self.dut.job_valid_i.value = 0
+        self.dut.worker_done_i.value = 0
         self.dut.rst_ni.value = 0
         await RisingEdge(self.dut.clk_i)
         await RisingEdge(self.dut.clk_i)
@@ -47,7 +49,6 @@ class L2AllocatorDriver:
             self.dut.l2_bank_base_i[b].value = bank_bases[b]
         self.dut.bank_limit_b_i.value = bank_limit
         self.dut.bank_header_size_b_i.value = bank_header_size 
-        await RisingEdge(self.dut.clk_i)
         
     async def set_job(self, window_size):        
         payload_len = len(self.dut.payload_i)
@@ -161,20 +162,21 @@ class GoldenModel:
             
             
             window_size = int(self.dut.window_size_i.value)
+            window_size_b = window_size * 4
             
             job_valid = int(self.dut.job_valid_i.value)
-            next_bank_idx = self.get_bank_idx(window_size)
+            next_bank_idx = self.get_bank_idx(window_size_b)
             worker_idx = self.get_idle_worker()
             
             # Dispatch
             if job_valid and next_bank_idx is not None and worker_idx is not None:
-                if self.fits_in_current_bank(window_size):
+                if self.fits_in_current_bank(window_size_b):
                     addr_out = self.state["current_addr"]
-                    self.state["current_addr"] += window_size
+                    self.state["current_addr"] += window_size_b
                 else:
                     addr_out = self.bank_bases[next_bank_idx] + self.bank_header_size
                     self.state["current_bank"] = next_bank_idx
-                    self.state["current_addr"] = addr_out + window_size
+                    self.state["current_addr"] = addr_out + window_size_b
                 
                 self.state["bank_assignments"][next_bank_idx].add(worker_idx)
                 
@@ -194,10 +196,10 @@ class GoldenModel:
             self.discard_assignments(self.dut.worker_done_i)
             
             
-    def get_bank_idx(self, window_size):
+    def get_bank_idx(self, window_size_b):
         current_bank = self.state["current_bank"]
         
-        if self.fits_in_current_bank(window_size):
+        if self.fits_in_current_bank(window_size_b):
             return current_bank
         
         next_bank = (current_bank + 1) % self.b_banks
@@ -217,8 +219,8 @@ class GoldenModel:
                 return i
         return None
         
-    def fits_in_current_bank(self, window_size):
-        new_addr = self.state["current_addr"] + window_size
+    def fits_in_current_bank(self, window_size_b):
+        new_addr = self.state["current_addr"] + window_size_b
         return new_addr <= self.bank_bases[self.state["current_bank"]] + self.bank_limit
         
     def discard_assignments(self, done_vector):
@@ -272,9 +274,6 @@ class Scoreboard:
         while True:
             exp = await self.expected_q.get()
             act = await self.actual_q.get()
-            
-            if exp != act:
-                await ClockCycles(self.dut.clk_i, 5)
                         
             assert exp['job_wid'] == act['job_wid'], f"Expected worker ID {exp['job_wid']}, got {act['job_wid']}"
             assert exp['job_addr'] == act['job_addr'], f"Expected job address {exp['job_addr']}, got {act['job_addr']}"
@@ -309,26 +308,25 @@ async def test_l2_allocator_crv(dut):
     golden_model = GoldenModel(dut, score_board)
     output_monitor = OutputMonitor(dut, score_board)
     
-    cocotb.start_soon(score_board.run())
-    
-    for _ in range(1):
-        await driver.reset()
-        
+    for i in range(100):
+        print(i)
         start_bank_idx = rnd.randint(0, b_banks - 1)
         bank_bases = [rnd.randint(0, 1024) for _ in range(b_banks)]
         bank_limit = 32768
         bank_header_size = 1024
         await driver.initialize(start_bank_idx, bank_bases, bank_limit, bank_header_size)
+        await driver.reset()
         
         score_board.clear()
         
         golden_model.reset()
         await golden_model.initialize()   
+        score_board_task = cocotb.start_soon(score_board.run())
         golden_model_task = cocotb.start_soon(golden_model.run())   
         output_monitor_task = cocotb.start_soon(output_monitor.monitor()) 
         
-        NUM_CYCLES = 10000
-        for j in range(NUM_CYCLES): 
+        NUM_CYCLES = 1000
+        for _ in range(NUM_CYCLES): 
             await RisingEdge(dut.clk_i)
             dut.job_valid_i.value = 0 
             dut.worker_done_i.value = 0
@@ -340,8 +338,7 @@ async def test_l2_allocator_crv(dut):
             if rnd.random() < 0.1:
                 await driver.set_done_vector(golden_model.get_busy_workers())
 
-                
-                
+        score_board_task.kill()
         golden_model_task.kill()
         output_monitor_task.kill()
                 

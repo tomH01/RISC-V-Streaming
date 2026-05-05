@@ -111,17 +111,32 @@ $memory_simple addPythonSimFiles [list \
 # Egress
 # ------
 
-set job_manager [EDA::Design::createComponent job_manager]
+set job_manager_wrapper [EDA::Design::createComponent job_manager_wrapper]
 
-$job_manager addHDLSourceFiles [list \
+$job_manager_wrapper addHDLSourceFiles [list \
+  "src/test/dma/egress/job_manager_wrapper.sv" \
   "src/hdl/dma/egress/job_manager.sv" \
+  "src/hdl/dma/egress/job_if.sv" \
   "src/hdl/common/mem/fwft_fifo.sv" \
   "src/hdl/common/arb/rr_arbiter.sv" \
   "src/hdl/common/flow_control/skid_buffer.sv" \
 ]
 
-$job_manager addPythonSimFiles [list \
+$job_manager_wrapper addPythonSimFiles [list \
   "src/test/dma/egress/test_job_manager.py" \
+]
+
+
+set l2_allocator_wrapper [EDA::Design::createComponent l2_allocator_wrapper]
+
+$l2_allocator_wrapper addHDLSourceFiles [list \
+  "src/test/dma/egress/l2_allocator_wrapper.sv" \
+  "src/hdl/dma/egress/l2_allocator.sv" \
+  "src/hdl/dma/egress/job_if.sv" \
+]
+
+$l2_allocator_wrapper addPythonSimFiles [list \
+  "src/test/dma/egress/test_l2_allocator.py" \
 ]
 
 
