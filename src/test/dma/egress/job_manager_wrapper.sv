@@ -37,7 +37,7 @@ module job_manager_wrapper #(
     .N_STREAMS(N_STREAMS),
     .M_MACROS(M_MACROS),
     .ADDR_WIDTH(ADDR_WIDTH)
-  ) u_job_if();
+  ) u_job_req_if();
 
   job_manager #(
     .N_STREAMS(N_STREAMS),
@@ -57,17 +57,17 @@ module job_manager_wrapper #(
     
     .window_size_i(window_size_i),
 
-    .job_o(u_job_if.manager)
+    .job_req_o(u_job_req_if.tx_ready)
   );
 
-  assign job_valid_o       = u_job_if.valid;
-  assign u_job_if.ready    = job_ready_i;
+  assign job_valid_o        = u_job_req_if.valid;
+  assign u_job_req_if.ready = job_ready_i;
 
-  assign job_stream_id_o    = u_job_if.pkt.stream_id;
-  assign job_start_macro_o  = u_job_if.pkt.start_macro;
-  assign job_window_size_o  = u_job_if.pkt.window_size; 
-  assign job_mode_o         = u_job_if.pkt.mode;
-  assign job_window_id_o    = u_job_if.pkt.window_id;
-  assign job_payload_o      = u_job_if.pkt.payload;
+  assign job_stream_id_o    = u_job_req_if.pkt.stream_id;
+  assign job_start_macro_o  = u_job_req_if.pkt.start_macro;
+  assign job_window_size_o  = u_job_req_if.pkt.window_size; 
+  assign job_mode_o         = u_job_req_if.pkt.mode;
+  assign job_window_id_o    = u_job_req_if.pkt.window_id;
+  assign job_payload_o      = u_job_req_if.pkt.payload;
 
 endmodule

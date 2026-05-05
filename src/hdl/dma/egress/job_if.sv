@@ -20,16 +20,22 @@ interface job_if #(
   logic     valid;
   logic     ready;
 
-  modport manager (
-    output pkt,
-    output valid,
+  modport tx_ready (
+    output pkt, valid,
     input  ready
   );
 
-  modport allocator (
-    input  pkt,
-    input  valid,
+  modport rx_ready (
+    input  pkt, valid,
     output ready
+  );
+
+  modport tx_push (
+    output pkt, valid
+  );
+
+  modport rx_push (
+    input pkt, valid
   );
 
 endinterface

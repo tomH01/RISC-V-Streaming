@@ -30,10 +30,10 @@ module control #(
   output logic [DATA_WIDTH-1:0] bank_header_size_b_o,
 
   // Ingress IF
-  output logic [N_STREAMS-1:0]        stream_en_o,
-  output logic [ADDR_WIDTH-1:0]       window_size_o  [N_STREAMS],
-  output logic [MACRO_PTR_WIDTH-1:0]  start_macro_o  [N_STREAMS],
-  output logic [MACRO_PTR_WIDTH-1:0]  next_pointer_o [M_MACROS],
+  output logic [N_STREAMS-1:0]       stream_en_o,
+  output logic [ADDR_WIDTH-1:0]      window_size_o  [N_STREAMS],
+  output logic [MACRO_PTR_WIDTH-1:0] start_macro_o  [N_STREAMS],
+  output logic [MACRO_PTR_WIDTH-1:0] next_pointer_o [M_MACROS],
 
   // Egress IF
   output logic                    cfg_push_o  [N_STREAMS],

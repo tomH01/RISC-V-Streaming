@@ -52,7 +52,7 @@ class JobManagerDriver:
 class GoldenModel:
     def __init__(self, dut, score_board, n_streams, fifo_depth):
         self.dut = dut
-        self.scoreboard = score_board
+        self.score_board = score_board
         self.n_streams = n_streams
         self.fifo_depth = fifo_depth
 
@@ -126,7 +126,7 @@ class GoldenModel:
                     'payload': st['current_cfg']['payload'] if (st['current_cfg'] and is_active) else 0
                 }
                 
-                self.scoreboard.add_expected(result)
+                self.score_board.add_expected(result)
                 
                 st['apply_counter'] += 1
                 st['current_window_id'] += 1
@@ -146,9 +146,9 @@ class GoldenModel:
 
 
 class OutputMonitor:
-    def __init__(self, dut, scoreboard):
+    def __init__(self, dut, score_board):
         self.dut = dut
-        self.scoreboard = scoreboard
+        self.score_board = score_board
         
     async def monitor(self):
         while True:
@@ -164,7 +164,7 @@ class OutputMonitor:
                     'window_id': int(self.dut.job_window_id_o.value),
                     'payload': int(self.dut.job_payload_o.value),
                 }
-                self.scoreboard.add_actual(result)
+                self.score_board.add_actual(result)
         
         
 class Scoreboard:
@@ -206,20 +206,20 @@ async def test_job_manager_crv(dut):
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
     n_streams = int(dut.N_STREAMS.value)
-    scoreboard = Scoreboard()
-    golden_model = GoldenModel(dut, scoreboard, n_streams, int(dut.FIFO_DEPTH.value))
+    score_board = Scoreboard()
+    golden_model = GoldenModel(dut, score_board, n_streams, int(dut.FIFO_DEPTH.value))
     driver = JobManagerDriver(dut, n_streams)
-    output_monitor = OutputMonitor(dut, scoreboard)
+    output_monitor = OutputMonitor(dut, score_board)
     
     
-    cocotb.start_soon(scoreboard.run())
+    cocotb.start_soon(score_board.run())
     cocotb.start_soon(output_monitor.monitor())
     cocotb.start_soon(golden_model.run())
     
     NUM_CYCLES = 100
     for _ in range(NUM_CYCLES):
         golden_model.reset()
-        scoreboard.clear()
+        score_board.clear()
         await driver.reset()
         
         for stream_id in range(n_streams):

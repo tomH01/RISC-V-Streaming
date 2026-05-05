@@ -22,7 +22,7 @@ module job_manager #(
   input logic [ADDR_WIDTH-1:0]   window_size_i [N_STREAMS],
 
   // Job IF
-  job_if.manager job_o
+  job_if.tx_ready job_req_o
 );
 
   typedef struct packed {
@@ -32,7 +32,7 @@ module job_manager #(
     logic [95:0] payload;
   } cfg_t;
 
-  typedef job_o.job_pkt_t job_pkt_t;
+  typedef job_req_o.job_pkt_t job_pkt_t;
 
   // Notification FIFOs
   logic                       notif_empty [N_STREAMS];
@@ -194,9 +194,9 @@ module job_manager #(
     .us_data_i(us_job_data),
     .us_ready_o(us_job_ready),
 
-    .ds_ready_i(job_o.ready),
-    .ds_valid_o(job_o.valid),
-    .ds_data_o(job_o.pkt)
+    .ds_ready_i(job_req_o.ready),
+    .ds_valid_o(job_req_o.valid),
+    .ds_data_o(job_req_o.pkt)
   );
 
 endmodule
