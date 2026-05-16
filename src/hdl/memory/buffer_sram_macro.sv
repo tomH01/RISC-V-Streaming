@@ -24,7 +24,7 @@ module buffer_sram_macro #() (
     input logic          wen,
     input logic [31:0]   wdata,
     input logic [3:0]    be,
-    output logic          gnt,
+    output logic         gnt,
     // ################################
     // Bus Interface - RESPONSE CHANNEL
     output logic         r_opc,

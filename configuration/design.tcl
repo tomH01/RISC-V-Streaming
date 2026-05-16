@@ -53,12 +53,12 @@ $rr_arbiter addPythonSimFiles [list \
 set buffer_pool [EDA::Design::createComponent buffer_pool]
 
 $buffer_pool addHDLSourceFiles [list \
-  "src/hdl/dma/ingress/buffer_pool.sv" \
+  "src/hdl/dma/buffer_pool.sv" \
   "src/hdl/memory/buffer_sram_macro.sv" \
 ]
 
 $buffer_pool addPythonSimFiles [list \
-  "src/test/dma/ingress/test_buffer_pool.py" \
+  "src/test/dma/test_buffer_pool.py" \
 ]
 
 
@@ -137,6 +137,17 @@ $l2_allocator_wrapper addHDLSourceFiles [list \
 
 $l2_allocator_wrapper addPythonSimFiles [list \
   "src/test/dma/egress/test_l2_allocator.py" \
+]
+
+
+set strided_addr_gen [EDA::Design::createComponent strided_addr_gen]
+
+$strided_addr_gen addHDLSourceFiles [list \
+  "src/hdl/dma/egress/strided_addr_gen.sv" \
+]
+
+$strided_addr_gen addPythonSimFiles [list \
+  "src/test/dma/egress/test_strided_addr_gen.py" \
 ]
 
 

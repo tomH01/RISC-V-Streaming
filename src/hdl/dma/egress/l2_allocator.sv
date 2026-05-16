@@ -5,7 +5,9 @@ module l2_allocator #(
   parameter int B_BANKS       = 2,
 
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS)
+  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
+  localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
+  localparam int WIDTH_SHIFT      = $clog2(DATA_WIDTH_BYTES)
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -33,12 +35,12 @@ module l2_allocator #(
 
   typedef job_req_i.job_pkt_t job_pkt_t;
 
-  logic [B_BANKS-1:0]        bank_busy_q, bank_busy_n;
-  logic [BANK_PTR_WIDTH-1:0] active_bank_q, active_bank_n;
-  logic [DATA_WIDTH-1:0]     bank_offset_q, bank_offset_n;
+  logic [B_BANKS-1:0]        bank_busy_q, bank_busy_d;
+  logic [BANK_PTR_WIDTH-1:0] active_bank_q, active_bank_d;
+  logic [DATA_WIDTH-1:0]     bank_offset_q, bank_offset_d;
 
   logic [W_WORKERS-1:0]      bank_worker_busy_q [B_BANKS];
-  logic [W_WORKERS-1:0]      bank_worker_busy_n [B_BANKS];
+  logic [W_WORKERS-1:0]      bank_worker_busy_d [B_BANKS];
 
 
   // Priority Encoder for Idle Workers
@@ -67,7 +69,7 @@ module l2_allocator #(
 
   // Job Dispatch Logic
   logic [DATA_WIDTH-1:0] current_job_size;
-  assign current_job_size = DATA_WIDTH'(job_req_i.pkt.window_size << 2);
+  assign current_job_size = DATA_WIDTH'(job_req_i.pkt.window_size << WIDTH_SHIFT);
 
   logic fits_in_current_bank;
   assign fits_in_current_bank = (bank_offset_q + bank_header_size_b_i + current_job_size) <= bank_limit_b_i;
@@ -95,33 +97,33 @@ module l2_allocator #(
 
   // Next state logic
   always_comb begin
-    active_bank_n = active_bank_q;
-    bank_offset_n  = bank_offset_q;
+    active_bank_d = active_bank_q;
+    bank_offset_d  = bank_offset_q;
 
     for (int b = 0; b < B_BANKS; b++) begin
-      bank_worker_busy_n[b] = bank_worker_busy_q[b];
+      bank_worker_busy_d[b] = bank_worker_busy_q[b];
     end
 
     // Worker done
     for (int b = 0; b < B_BANKS; b++) begin
-      bank_worker_busy_n[b] &= ~worker_done_i;
+      bank_worker_busy_d[b] &= ~worker_done_i;
     end
 
     // Dispatch Job
     if (do_dispatch) begin
-      active_bank_n = target_bank;
-      bank_worker_busy_n[target_bank][idle_wid] = 1'b1;
+      active_bank_d = target_bank;
+      bank_worker_busy_d[target_bank][idle_wid] = 1'b1;
 
       if (fits_in_current_bank) begin
-        bank_offset_n = bank_offset_q + current_job_size;
+        bank_offset_d = bank_offset_q + current_job_size;
       end else begin
-        bank_offset_n = current_job_size;
+        bank_offset_d = current_job_size;
       end
     end
 
     // Bank Busy logic
     for (int b = 0; b < B_BANKS; b++) begin
-      bank_busy_n[b] = (BANK_PTR_WIDTH'(b) == active_bank_n) || (|bank_worker_busy_n[b]);
+      bank_busy_d[b] = (BANK_PTR_WIDTH'(b) == active_bank_d) || (|bank_worker_busy_d[b]);
     end
   end
 
@@ -138,10 +140,10 @@ module l2_allocator #(
       job_addr_q         <= '0;
       job_bank_q         <= '0;
     end else begin
-      active_bank_q      <= active_bank_n;
-      bank_offset_q      <= bank_offset_n;
-      bank_busy_q        <= bank_busy_n;
-      bank_worker_busy_q <= bank_worker_busy_n;
+      active_bank_q      <= active_bank_d;
+      bank_offset_q      <= bank_offset_d;
+      bank_busy_q        <= bank_busy_d;
+      bank_worker_busy_q <= bank_worker_busy_d;
 
       job_valid_q        <= do_dispatch;
       if (do_dispatch) begin

@@ -11,12 +11,13 @@ module ingress_top #(
   input logic rst_ni,
 
   // Stream IF
-  input logic                  stream_valid_i [N_STREAMS],
-  input logic [DATA_WIDTH-1:0] stream_data_i  [N_STREAMS],
-  output logic                 stream_ready_o [N_STREAMS],
+  input  logic                  stream_valid_i [N_STREAMS],
+  input  logic [DATA_WIDTH-1:0] stream_data_i  [N_STREAMS],
+  output logic                  stream_ready_o [N_STREAMS],
 
   // Buffer Pool IF
-  input logic  [M_MACROS-1:0]   bp_gnt_i,
+  input  logic [M_MACROS-1:0]   bp_gnt_i,
+  output logic [M_MACROS-1:0]   bp_done_o,
   output logic [M_MACROS-1:0]   bp_req_o,
   output logic [ADDR_WIDTH-1:0] bp_addr_o  [M_MACROS],
   output logic [DATA_WIDTH-1:0] bp_wdata_o [M_MACROS],
@@ -90,6 +91,8 @@ module ingress_top #(
     .am_macro_sel_o(am_macro_sel),
     .am_req_o(am_req),
     .am_addr_o(am_addr),
+
+    .done_o(bp_done_o),  
 
     .window_valid_o(notify_valid_o),
     .window_start_o(notify_start_macro_o)

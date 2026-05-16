@@ -1,4 +1,4 @@
-import random as rd
+import random as rnd
 
 from typing import Dict
 
@@ -44,7 +44,7 @@ class IngressTopDriver:
             
     async def send_words(self, stream_idx, nb_words, delay_prob=0.0):
         for word in range(0xFFFFFFFF, 0xFFFFFFFF-nb_words, -1):
-            while rd.random() < delay_prob:
+            while rnd.random() < delay_prob:
                 self.dut.stream_valid_i[stream_idx].value = 0
                 await RisingEdge(self.dut.clk_i)
                 
@@ -66,11 +66,11 @@ class ConfigRandomizer:
         configs = {}
         
         available_macros = list(range(self.m_macros))
-        rd.shuffle(available_macros)    
+        rnd.shuffle(available_macros)    
         
-        nb_active_streams = rd.randint(1, self.n_streams)
+        nb_active_streams = rnd.randint(1, self.n_streams)
             
-        active_stream_ids = rd.sample(range(self.n_streams), nb_active_streams)
+        active_stream_ids = rnd.sample(range(self.n_streams), nb_active_streams)
         window_sizes, macros_per_window_list = self._generate_window_sizes(nb_active_streams)
         
         for i, stream_idx in enumerate(active_stream_ids):
@@ -79,7 +79,7 @@ class ConfigRandomizer:
                 required_left_macros += macros_per_window_list[s] * 2
                     
             max_macros_to_allocate = len(available_macros) - required_left_macros
-            multiplier = rd.randint(2, max_macros_to_allocate // macros_per_window_list[i])
+            multiplier = rnd.randint(2, max_macros_to_allocate // macros_per_window_list[i])
             num_allocated_macros = multiplier * macros_per_window_list[i]
             
             macros = [available_macros.pop() for _ in range(num_allocated_macros)]
@@ -107,7 +107,7 @@ class ConfigRandomizer:
             reserved = streams_left * 2
             
             while True:
-                window_size = rd.randint(1, 2 * self.macro_depth)
+                window_size = rnd.randint(1, 2 * self.macro_depth)
                 macros_per_window = (window_size - 1) // self.macro_depth + 1
                 
                 if macros_per_window * 2 <= (pool - reserved):
@@ -128,16 +128,28 @@ class InputMonitor:
 
     async def monitor(self):
         while True:
-            await RisingEdge(self.dut.clk_i)
+            await RisingEdge(self.dut.clk_i)            
             await ReadOnly()
             
             if self.dut.stream_valid_i[self.stream_idx].value == 1 and self.dut.stream_ready_o[self.stream_idx].value == 1:
                 data = self.dut.stream_data_i[self.stream_idx].value.integer
-                macro, expected_txn, expected_notif = self.golden_model.process_transaction(self.stream_idx, data)
+                macro, expected_txn, expected_notif, expected_done_macro = self.golden_model.process_transaction(self.stream_idx, data)
                 self.scoreboard.add_expected(macro, expected_txn)
+                
                 if expected_notif:
                     self.scoreboard.add_expected_notification(self.stream_idx, expected_notif)
-    
+                    
+                if expected_done_macro:
+                    cocotb.start_soon(self.check_delayed_done(expected_done_macro))
+                        
+    async def check_delayed_done(self, expected_macro):
+        await RisingEdge(self.dut.clk_i)
+        await ReadOnly()
+        
+        expected = int(self.dut.bp_done_o[expected_macro].value)
+        assert expected == 1, f"Expected done signal for macro {expected_macro} asserted, got {expected}."
+
+
 class NotificationMonitor:
     def __init__(self, dut, n_streams, scoreboard):
         self.dut = dut
@@ -223,22 +235,24 @@ class GoldenModel:
         state['window_cnt'] += 1
         
         expected_notification = None
+        expected_done_macro = None
         
         if state['window_cnt'] >= config['window_size']:
             expected_notification = {
                 "stream_idx": stream_idx,
                 "macro": state['window_start_macro'],
             }
+            expected_done_macro = state['current_macro']
             
             state['current_macro'] = config['topology'][state['current_macro']]
             state['macro_word_cnt'] = 0
             state['window_cnt'] = 0
             
-        if state['macro_word_cnt'] >= self.macro_depth:
+        elif state['macro_word_cnt'] >= self.macro_depth:
             state['current_macro'] = config['topology'][state['current_macro']]
             state['macro_word_cnt'] = 0   
             
-        return expected_macro, expected, expected_notification 
+        return expected_macro, expected, expected_notification, expected_done_macro
             
         
 class ScoreBoard:
@@ -291,6 +305,8 @@ class ScoreBoard:
     
 @cocotb.test()
 async def test_ingress_top_crv(dut):
+    rnd.seed(42)  
+    
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
     n_streams = int(dut.N_STREAMS.value)
@@ -345,7 +361,7 @@ async def test_ingress_top_crv(dut):
             
             task = cocotb.start_soon(driver.send_words(
                 stream_idx, 
-                nb_words=rd.randint(1, int(max_words)), 
+                nb_words=rnd.randint(1, int(max_words)), 
                 delay_prob=0.3
             ))
             tasks.append(task)

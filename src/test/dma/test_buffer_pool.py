@@ -31,12 +31,13 @@ def cover_byte_enable(be):
     pass
 
 class BufferPoolDriver:
-    def __init__(self, dut, m_macros, nb_read_ports):
+    def __init__(self, dut, m_macros, num_read_ports):
         self.dut = dut
         self.m_macros = m_macros
-        self.nb_read_ports = nb_read_ports
+        self.num_read_ports = num_read_ports
         
-        self.dut.macro_owner_i.value = 0
+        self.dut.ingress_done_i.value = 0   
+        self.dut.egress_release_i.value = 0
         self.dut.ingress_req_i.value = 0
 
         for i in range(self.m_macros):
@@ -46,7 +47,7 @@ class BufferPoolDriver:
 
         self.dut.egress_req_i.value = 0
 
-        for i in range(nb_read_ports):
+        for i in range(num_read_ports):
             self.dut.egress_addr_i[i].value = 0
             self.dut.egress_macro_select_i[i].value = 0
 
@@ -57,8 +58,12 @@ class BufferPoolDriver:
         self.dut.rst_ni.value = 1
         await RisingEdge(self.dut.clk_i)
 
-    def set_owner(self, macro_idx, owner):
-        self.dut.macro_owner_i[macro_idx].value = owner
+    async def switch_owner(self, macro_idx):
+        self.dut.egress_release_i[macro_idx].value = 1
+        self.dut.ingress_done_i[macro_idx].value = 1
+        await RisingEdge(self.dut.clk_i)
+        self.dut.egress_release_i[macro_idx].value = 0
+        self.dut.ingress_done_i[macro_idx].value = 0
 
     async def write_ingress(self, macro_idx, addr, data, be=0xF):
         cover_address(addr)
@@ -111,25 +116,25 @@ async def test_rw_coverage(dut):
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
 
     m_macros = int(dut.M_MACROS.value)
-    nb_read_ports = int(dut.NB_READ_PORTS.value)
+    num_read_ports = int(dut.NUM_READ_PORTS.value)
 
-    env = BufferPoolDriver(dut, m_macros, nb_read_ports)
-    await env.reset()
+    driver = BufferPoolDriver(dut, m_macros, num_read_ports)
+    await driver.reset()
 
     for macro_id in range(m_macros):
-        env.set_owner(macro_id, 0)
         test_addr = rnd.choice([0, 1020, rnd.randrange(4, 1020, 4)])
         test_data = rnd.randint(0, 0xFFFFFFFF)
 
-        await env.write_ingress(macro_id, test_addr, test_data)
+        await driver.write_ingress(macro_id, test_addr, test_data)
 
-        env.set_owner(macro_id, 1)
+        await driver.switch_owner(macro_id)
 
-        read_port = rnd.randint(0, nb_read_ports - 1)
-        read_data = await env.read_egress(read_port, macro_id, test_addr)
+        read_port = rnd.randint(0, num_read_ports - 1)
+        read_data = await driver.read_egress(read_port, macro_id, test_addr)
 
         assert read_data == test_data, f"Data mismatch in macro {macro_id} at {hex(test_addr)}: Read: {read_data}, Expected: {test_data}."
 
         await RisingEdge(dut.clk_i)
+        await driver.switch_owner(macro_id)
 
     coverage_db.report_coverage(dut.log.info, bins=True)

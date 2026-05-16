@@ -25,6 +25,10 @@ module alloc_manager #(
   output logic [N_STREAMS-1:0]       am_req_o,
   output logic [ADDR_WIDTH-1:0]      am_addr_o       [N_STREAMS],
 
+  // Buffer Pool IF
+  output logic  [M_MACROS-1:0] done_o,
+
+  // Egress IF
   output logic [N_STREAMS-1:0]       window_valid_o,
   output logic [MACRO_PTR_WIDTH-1:0] window_start_o [N_STREAMS]
 );
@@ -39,6 +43,18 @@ module alloc_manager #(
   logic [N_STREAMS-1:0] window_end;
   logic [N_STREAMS-1:0] macro_end;
 
+  // Done Logic
+  always_comb begin
+    done_o = '0;
+
+    for (int n = 0; n < N_STREAMS; n++) begin
+      if (cfg_stream_en_i[n] && is_initialized_q[n] && window_end[n]) begin
+        done_o[current_macro_q[n]] = 1'b1;
+      end
+    end
+  end
+
+  // Allocation Logic
   genvar n;
   generate
     for (n = 0; n < N_STREAMS; n++) begin
