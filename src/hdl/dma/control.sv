@@ -5,8 +5,10 @@ module control #(
   parameter int DATA_WIDTH    = 32,
   parameter int ADDR_WIDTH    = 32,
   parameter int MACRO_DEPTH   = 256,
+  parameter int B_BANKS       = 2,
 
-  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS)
+  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS),
+  localparam int BANK_PTR_WIDTH  = $clog2(B_BANKS)
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -22,22 +24,23 @@ module control #(
   output logic 					        pslverr_o,
 
   // Global Control IF
-  output logic                  dma_enable_o,
-  output logic                  start_bank_idx_o,
-  output logic [DATA_WIDTH-1:0] l2_ping_base_o,
-  output logic [DATA_WIDTH-1:0] l2_pong_base_o,
-  output logic [DATA_WIDTH-1:0] bank_limit_b_o,
-  output logic [DATA_WIDTH-1:0] bank_header_size_b_o,
+  output logic                      dma_enable_o,
+  output logic [BANK_PTR_WIDTH-1:0] start_bank_idx_o,
+  output logic [DATA_WIDTH-1:0]     l2_bank_base_o [B_BANKS],
+  output logic [DATA_WIDTH-1:0]     bank_limit_b_o,
+  output logic [DATA_WIDTH-1:0]     bank_header_size_b_o,
 
   // Ingress IF
   output logic [N_STREAMS-1:0]       stream_en_o,
   output logic [ADDR_WIDTH-1:0]      window_size_o  [N_STREAMS],
   output logic [MACRO_PTR_WIDTH-1:0] start_macro_o  [N_STREAMS],
-  output logic [MACRO_PTR_WIDTH-1:0] next_pointer_o [M_MACROS],
 
   // Egress IF
   output logic                    cfg_push_o  [N_STREAMS],
-  output logic [4*DATA_WIDTH-1:0] cfg_wdata_o [N_STREAMS]
+  output logic [4*DATA_WIDTH-1:0] cfg_wdata_o [N_STREAMS],
+
+  // Topology IF
+  output logic [MACRO_PTR_WIDTH-1:0] next_pointer_o [M_MACROS]
 );
 
   logic wr_en;
@@ -46,8 +49,7 @@ module control #(
   assign pslverr_o = 1'b0;
 
   logic [DATA_WIDTH-1:0] global_ctrl_q;
-  logic [DATA_WIDTH-1:0] l2_ping_base_q;
-  logic [DATA_WIDTH-1:0] l2_pong_base_q;
+  logic [DATA_WIDTH-1:0] l2_bank_base_q [B_BANKS];
   logic [DATA_WIDTH-1:0] bank_limit_b_q;
   logic [DATA_WIDTH-1:0] bank_header_size_b_q;
 
@@ -82,8 +84,7 @@ module control #(
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
       global_ctrl_q        <= '0;
-      l2_ping_base_q       <= '0;
-      l2_pong_base_q       <= '0;
+      l2_bank_base_q       <= '{default: '0};
       bank_limit_b_q       <= '0;
       bank_header_size_b_q <= '0; 
 
@@ -97,55 +98,57 @@ module control #(
       cfg_wdata_q       <= '{default: '0};
 
       next_pointer_q    <= '{default: '0};
-    end else if (wr_en) begin
-      // Global Configuration
-      if (is_global_cfg) begin
-        case (global_offset)
-          12'h00: global_ctrl_q        <= pwdata_i;
-          12'h04: l2_ping_base_q       <= pwdata_i;
-          12'h08: l2_pong_base_q       <= pwdata_i;
-          12'h0C: bank_limit_b_q       <= pwdata_i;
-          12'h10: bank_header_size_b_q <= pwdata_i;
-          default: ;
-        endcase
-      end
-
-      // Stream Configurations
-      else if (is_stream_cfg && (stream_idx < N_STREAMS)) begin
-        case (stream_offset)
-          6'h00: start_macro_q[stream_idx]     <= MACRO_PTR_WIDTH'(pwdata_i);
-          6'h04: window_size_q[stream_idx]     <= pwdata_i;
-          6'h08: stream_en_q[stream_idx]       <= pwdata_i[0];
-          6'h10: egress_shadow_0_q[stream_idx] <= pwdata_i; 
-          6'h14: egress_shadow_1_q[stream_idx] <= pwdata_i;
-          6'h18: egress_shadow_2_q[stream_idx] <= pwdata_i;
-          default: ;
-        endcase
-
-        if (stream_offset == 6'h1C) begin
-          cfg_push_q[stream_idx]  <= 1'b1;
-          cfg_wdata_q[stream_idx] <= {egress_shadow_0_q[stream_idx], egress_shadow_1_q[stream_idx], egress_shadow_2_q[stream_idx], pwdata_i};
-        end else begin
-          cfg_push_q[stream_idx]  <= 1'b0;
+    end else begin
+      cfg_push_q <= '{default: 1'b0}; 
+      if (wr_en) begin
+        // Global Configuration
+        if (is_global_cfg) begin
+          case (global_offset)
+            12'h00: global_ctrl_q        <= pwdata_i;
+            12'h04: l2_bank_base_q[0]    <= pwdata_i;
+            12'h08: l2_bank_base_q[1]    <= pwdata_i;
+            12'h0C: bank_limit_b_q       <= pwdata_i;
+            12'h10: bank_header_size_b_q <= pwdata_i;
+            default: ;
+          endcase
         end
+
+        // Stream Configurations
+        else if (is_stream_cfg && (stream_idx < N_STREAMS)) begin
+          case (stream_offset)
+            6'h00: start_macro_q[stream_idx]     <= MACRO_PTR_WIDTH'(pwdata_i);
+            6'h04: window_size_q[stream_idx]     <= pwdata_i;
+            6'h08: stream_en_q[stream_idx]       <= pwdata_i[0];
+            6'h10: egress_shadow_0_q[stream_idx] <= pwdata_i; 
+            6'h14: egress_shadow_1_q[stream_idx] <= pwdata_i;
+            6'h18: egress_shadow_2_q[stream_idx] <= pwdata_i;
+            default: ;
+          endcase
+
+          if (stream_offset == 6'h1C) begin
+            cfg_push_q[stream_idx]  <= 1'b1;
+            cfg_wdata_q[stream_idx] <= {egress_shadow_0_q[stream_idx], egress_shadow_1_q[stream_idx], egress_shadow_2_q[stream_idx], pwdata_i};
+          end else begin
+            cfg_push_q[stream_idx]  <= 1'b0;
+          end
+        end
+
+        // Topology Configuration
+        else if (is_topology) begin
+          automatic int macro_idx_0 = {topology_word_idx, 1'b0};
+          automatic int macro_idx_1 = {topology_word_idx, 1'b1};
+
+          if (macro_idx_0 < M_MACROS) next_pointer_q[macro_idx_0] <= MACRO_PTR_WIDTH'(pwdata_i[15:0]);
+          if (macro_idx_1 < M_MACROS) next_pointer_q[macro_idx_1] <= MACRO_PTR_WIDTH'(pwdata_i[31:16]);
+        end
+
       end
-
-      // Topology Configuration
-      else if (is_topology) begin
-        automatic int macro_idx_0 = {topology_word_idx, 1'b0};
-        automatic int macro_idx_1 = {topology_word_idx, 1'b1};
-
-        if (macro_idx_0 < M_MACROS) next_pointer_q[macro_idx_0] <= MACRO_PTR_WIDTH'(pwdata_i[15:0]);
-        if (macro_idx_1 < M_MACROS) next_pointer_q[macro_idx_1] <= MACRO_PTR_WIDTH'(pwdata_i[31:16]);
-      end
-
     end
   end
 
   assign dma_enable_o         = global_ctrl_q[0];
   assign start_bank_idx_o     = global_ctrl_q[1];
-  assign l2_ping_base_o       = l2_ping_base_q;
-  assign l2_pong_base_o       = l2_pong_base_q;
+  assign l2_bank_base_o       = l2_bank_base_q;
   assign bank_limit_b_o       = bank_limit_b_q;
   assign bank_header_size_b_o = bank_header_size_b_q;
 
