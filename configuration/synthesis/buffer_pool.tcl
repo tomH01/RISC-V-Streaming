@@ -10,7 +10,7 @@ set syn_config my
 set module "buffer_pool"
 
 # Get Technology
-set technology [EDA::Technology::getTechnology 22fdsoi_plus]
+set technology [EDA::Technology::getTechnology "22fdsoi_plus"]
 set pdk [$technology getPDK]
 
 $syn_config setTechnology $technology
