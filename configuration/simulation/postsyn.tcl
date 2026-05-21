@@ -8,19 +8,29 @@
 
 set sim_config my
 
+set module "ingress_top"
+
+# Parameters
+set bottle_dir "/local/hageltom/teda/bottles/risc-v-streaming"
+source [file normalize [file join $bottle_dir "configuration" "params.tcl"]]
+dict for {param value} $::params {
+    $sim_config addParameter $param $value
+}
+
+
 # Set top module paths
-$sim_config setDesignTopModulePath "apb_pmc"
-$sim_config setSimulationTopModulePath "apb_pmc"
+$sim_config setDesignTopModulePath $module
+$sim_config setSimulationTopModulePath $module
 
 # Add reference to synthesis
-set syn_config [EDA::Synthesis::getConfiguration mock_streaming]
+set syn_config [EDA::Synthesis::getConfiguration $module]
 $sim_config addReferencedConfiguration $syn_config
 
 # Set timescale
 $sim_config setDefaultTimescale "1ps/1ps"
 
 # Add Components
-$sim_config addComponent [EDA::Design::getComponent "mock_streaming"] top
+$sim_config addComponent [EDA::Design::getComponent $module] top
 
 
 #=================
@@ -30,7 +40,7 @@ $sim_config addComponent [EDA::Design::getComponent "mock_streaming"] top
 # Scope to add waveform probe to
 $sim_config setWaveformEnabled 1
 $sim_config setWaveformType [EDA::WaveformType::SHM]
-$sim_config addWaveformScope "apb_pmc"
+$sim_config addWaveformScope $module
 
 # Enable cocotb testbenches
 $sim_config setPythonTestbenchEnabled 1
@@ -38,7 +48,7 @@ $sim_config setPythonTestbenchEnabled 1
 #=======
 # Timing
 #=======
-$sim_config addScopeSDFTyp "apb_pmc" [EDA::Synthesis::Files::SDF $syn_config [EDA::Design::getView typ]]
+$sim_config addScopeSDFTyp $module [EDA::Synthesis::Files::SDF $syn_config [EDA::Design::getView typ]]
 $sim_config setTiming 1
 $sim_config setTimingChecks 1
 $sim_config setSuppressGlitchCheck 1

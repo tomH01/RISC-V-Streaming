@@ -23,6 +23,8 @@ module ingress_crossbar #(
 );
 
   always_comb begin
+    int m;
+
     stream_ready_o = '0;
 
     bp_req_o   = '0;
@@ -30,17 +32,15 @@ module ingress_crossbar #(
     bp_wdata_o = '{default: '0};
     bp_be_o    = '{default: 4'hF};
 
-    for (int m = 0; m < M_MACROS; m++) begin
-      for (int n = 0; n < N_STREAMS; n++) begin
-        if (am_req_i[n] && am_macro_sel_i[n] == m) begin
-          bp_req_o[m]   = am_req_i[n];
-          bp_addr_o[m]  = am_addr_i[n];
-          bp_wdata_o[m] = stream_data_i[n];
+    for (int n = 0; n < N_STREAMS; n++) begin
+      if (am_req_i[n]) begin
+        m = am_macro_sel_i[n];
 
-          stream_ready_o[n] = bp_gnt_i[m];
-          
-          break;
-        end 
+        bp_req_o[m]   = 1'b1;
+        bp_addr_o[m]  = am_addr_i[n];
+        bp_wdata_o[m] = stream_data_i[n];
+
+        stream_ready_o[n] = bp_gnt_i[m];
       end
     end
   end

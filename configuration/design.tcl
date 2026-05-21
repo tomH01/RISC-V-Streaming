@@ -7,10 +7,14 @@
 #
 
 
-
 # ------
 # Common
 # ------
+
+set global_sim_files [list \
+  "src/test/tools/get_param.py" \
+]
+
 
 set skid_buffer [EDA::Design::createComponent skid_buffer]
 
@@ -18,9 +22,9 @@ $skid_buffer addHDLSourceFiles [list \
   "src/hdl/common/flow_control/skid_buffer.sv" 
 ]
 
-$skid_buffer addPythonSimFiles [list \
+$skid_buffer addPythonSimFiles [concat $global_sim_files [list \
   "src/test/common/flow_control/test_skid_buffer.py" \
-]
+]]
 
 
 set fwft_fifo [EDA::Design::createComponent fwft_fifo]
@@ -29,9 +33,9 @@ $fwft_fifo addHDLSourceFiles [list \
   "src/hdl/common/mem/fwft_fifo.sv" \
 ]
 
-$fwft_fifo addPythonSimFiles [list \
+$fwft_fifo addPythonSimFiles [concat $global_sim_files [list \
   "src/test/common/mem/test_fwft_fifo.py" \
-]
+]]
 
 
 set rr_arbiter [EDA::Design::createComponent rr_arbiter]
@@ -40,9 +44,9 @@ $rr_arbiter addHDLSourceFiles [list \
   "src/hdl/common/arb/rr_arbiter.sv" \
 ]
 
-$rr_arbiter addPythonSimFiles [list \
+$rr_arbiter addPythonSimFiles [concat $global_sim_files [list \
   "src/test/common/arb/test_rr_arbiter.py" \
-]
+]]
 
 
 
@@ -57,9 +61,9 @@ $buffer_pool addHDLSourceFiles [list \
   "src/hdl/memory/buffer_sram_macro.sv" \
 ]
 
-$buffer_pool addPythonSimFiles [list \
+$buffer_pool addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/test_buffer_pool.py" \
-]
+]]
 
 
 set ingress_crossbar [EDA::Design::createComponent ingress_crossbar]
@@ -68,9 +72,9 @@ $ingress_crossbar addHDLSourceFiles [list \
   "src/hdl/dma/ingress/ingress_crossbar.sv" \
 ]
 
-$ingress_crossbar addPythonSimFiles [list \
+$ingress_crossbar addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/ingress/test_ingress_crossbar.py" \
-]
+]]
 
 
 set alloc_manager [EDA::Design::createComponent alloc_manager]
@@ -89,9 +93,9 @@ $ingress_top addHDLSourceFiles [list \
   "src/hdl/dma/ingress/alloc_manager.sv" \
 ]
 
-$ingress_top addPythonSimFiles [list \
+$ingress_top addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/ingress/test_ingress_top.py" \
-]
+]]
 
 
 
@@ -101,9 +105,9 @@ $memory_simple addHDLSourceFiles [list \
   "src/hdl/memory/memory_simple.sv"
   ]
   
-$memory_simple addPythonSimFiles [list \
+$memory_simple addPythonSimFiles [concat $global_sim_files [list \
   "src/test/test_memory_simple.py" \
-]
+]]
 
 
 
@@ -122,9 +126,9 @@ $job_manager_wrapper addHDLSourceFiles [list \
   "src/hdl/common/flow_control/skid_buffer.sv" \
 ]
 
-$job_manager_wrapper addPythonSimFiles [list \
+$job_manager_wrapper addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/egress/test_job_manager.py" \
-]
+]]
 
 
 set l2_allocator_wrapper [EDA::Design::createComponent l2_allocator_wrapper]
@@ -135,9 +139,9 @@ $l2_allocator_wrapper addHDLSourceFiles [list \
   "src/hdl/dma/egress/job_if.sv" \
 ]
 
-$l2_allocator_wrapper addPythonSimFiles [list \
+$l2_allocator_wrapper addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/egress/test_l2_allocator.py" \
-]
+]]
 
 
 set strided_addr_gen [EDA::Design::createComponent strided_addr_gen]
@@ -146,9 +150,9 @@ $strided_addr_gen addHDLSourceFiles [list \
   "src/hdl/dma/egress/strided_addr_gen.sv" \
 ]
 
-$strided_addr_gen addPythonSimFiles [list \
+$strided_addr_gen addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/egress/test_strided_addr_gen.py" \
-]
+]]
 
 
 
@@ -162,9 +166,9 @@ $control addHDLSourceFiles [list \
   "src/hdl/dma/control.sv" \
 ]
 
-$control addPythonSimFiles [list \
+$control addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/test_control.py" \
-]
+]]
 
 
 # memory_macro

@@ -1,7 +1,6 @@
 module control #(
   parameter int N_STREAMS     = 4,
   parameter int M_MACROS      = 8,
-  parameter int NB_READ_PORTS = 1,
   parameter int DATA_WIDTH    = 32,
   parameter int ADDR_WIDTH    = 32,
   parameter int MACRO_DEPTH   = 256,

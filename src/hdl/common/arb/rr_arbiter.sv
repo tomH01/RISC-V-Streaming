@@ -1,19 +1,19 @@
 module rr_arbiter #(
-  parameter int N = 4
+  parameter int NUM_REQS = 4
 )(
   input logic clk_i,
   input logic rst_ni,
 
-  input logic          req_i,
-  input logic  [N-1:0] ready_i,
-  output logic [N-1:0] gnt_o,
-  output logic         valid_o
+  input  logic                req_i,
+  input  logic [NUM_REQS-1:0] ready_i,
+  output logic [NUM_REQS-1:0] gnt_o,
+  output logic                valid_o
 );
 
-  logic [N-1:0] pointer, pointer_next;
-  logic [N-1:0] mask;
-  logic [N-1:0] choose_high, choose_low;
-  logic [N-1:0] grant;
+  logic [NUM_REQS-1:0] pointer, pointer_next;
+  logic [NUM_REQS-1:0] mask;
+  logic [NUM_REQS-1:0] choose_high, choose_low;
+  logic [NUM_REQS-1:0] grant;
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin

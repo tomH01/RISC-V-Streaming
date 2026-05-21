@@ -4,6 +4,8 @@ import random as rnd
 from cocotb.triggers import ClockCycles, FallingEdge, ReadOnly, RisingEdge
 from cocotb.clock import Clock
 
+from get_param import get_param
+
 
 class RRGoldenModel:
     def __init__(self, n):
@@ -24,7 +26,7 @@ class RRGoldenModel:
     
 @cocotb.test()
 async def test_rr_arbiter(dut):
-    n = int(dut.N.value)
+    n = get_param(dut, "NUM_REQS")
     rnd.seed(42)
     golden_model = RRGoldenModel(n)
     

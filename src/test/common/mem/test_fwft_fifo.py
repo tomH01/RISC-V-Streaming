@@ -1,3 +1,5 @@
+import os
+
 import cocotb
 import random as rd
 
@@ -6,6 +8,9 @@ from collections import deque
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge, ReadOnly
 from cocotb_coverage.coverage import CoverPoint, CoverCross, coverage_db
+
+from get_param import get_param 
+
 
 @CoverPoint("fifo.push",
             xf=lambda push, pop, empty, full: push,
@@ -56,12 +61,11 @@ class FIFOScoreboard:
         return self.model[0]
     
     
-async def fifo_driver(dut):
-    DATA_WIDTH = int(dut.DATA_WIDTH.value)
+async def fifo_driver(dut, data_width):
     while True:
         push = rd.choice([0, 1])
         pop = rd.choice([0, 1])
-        data = rd.getrandbits(DATA_WIDTH)
+        data = rd.getrandbits(data_width)
         
         dut.push_i.value = push
         dut.pop_i.value = pop
@@ -98,8 +102,9 @@ async def fifo_monitor(dut, scoreboard):
     
 @cocotb.test()
 async def test_fwft_fifo_crv(dut):
-    DEPTH = int(dut.DEPTH.value)
-    
+    DEPTH = get_param(dut, "DEPTH")
+    DATA_WIDTH = get_param(dut, "DATA_WIDTH")
+
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
     
     dut.rst_ni.value = 0
@@ -116,7 +121,7 @@ async def test_fwft_fifo_crv(dut):
     
     scoreboard = FIFOScoreboard(DEPTH)
     
-    driver_task = cocotb.start_soon(fifo_driver(dut))
+    driver_task = cocotb.start_soon(fifo_driver(dut, DATA_WIDTH))
     monitor_task = cocotb.start_soon(fifo_monitor(dut, scoreboard))
     
     NUM_CYCLES = 100000

@@ -1,0 +1,10 @@
+dict set ::params N_STREAMS 4
+dict set ::params M_MACROS 8
+dict set ::params DATA_WIDTH 32
+dict set ::params ADDR_WIDTH 32
+dict set ::params MACRO_DEPTH 256
+dict set ::params B_BANKS 2
+dict set ::params DATA_WIDTH 32
+dict set ::params DEPTH 8
+dict set ::params NUM_REQS 4
+dict set ::params NUM_READ_PORTS 2

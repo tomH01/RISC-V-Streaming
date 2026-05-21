@@ -3,13 +3,17 @@ import random as rnd
 
 from cocotb.triggers import Timer
 
+from get_param import get_param
+
 
 @cocotb.test()
 async def test_crossbar_routing(dut):
-    N_STREAMS = int(dut.N_STREAMS.value)
-    M_MACROS = int(dut.M_MACROS.value)
-    DATA_WIDTH = int(dut.DATA_WIDTH)
-    ADDR_WIDTH = int(dut.ADDR_WIDTH)
+    rnd.seed(42)
+    
+    N_STREAMS = get_param(dut, "N_STREAMS")
+    M_MACROS = get_param(dut, "M_MACROS")
+    DATA_WIDTH = get_param(dut, "DATA_WIDTH")
+    ADDR_WIDTH = get_param(dut, "ADDR_WIDTH")
 
     NUM_TESTS = 1000
 
@@ -42,14 +46,18 @@ async def test_crossbar_routing(dut):
 
             if m in targets:
                 n = targets.index(m)
-
                 expected_req = (am_req >> n) & 1
+                
                 assert bp_req_m == expected_req, f"Test {test_idx}: bp_req_o mismatch on macro {m}: Expected: {expected_req} Got: {bp_req_m}"
-                assert bp_addr_n == am_addr[n], f"Test {test_idx}: bp_addr_o mismatch on macro {m}: Expected: {am_addr[n]} Got: {bp_addr_n}"
-                assert bp_wdata_n == stream_data[n], f"Test {test_idx}: bp_wdata_o mismatch on macro {m}: Expected: {stream_data[n]} Got: {bp_wdata_n}"
+                if expected_req == 1:
+                    assert bp_addr_n == am_addr[n], f"Test {test_idx}: bp_addr_o mismatch on macro {m}: Expected: {am_addr[n]} Got: {bp_addr_n}"
+                    assert bp_wdata_n == stream_data[n], f"Test {test_idx}: bp_wdata_o mismatch on macro {m}: Expected: {stream_data[n]} Got: {bp_wdata_n}"
+                else:
+                    assert bp_addr_n == 0, f"Test {test_idx}: bp_addr_o should be 0 on macro {m} when am_req_i is 0: Got: {bp_addr_n}"
+                    assert bp_wdata_n == 0, f"Test {test_idx}: bp_wdata_o should be 0 on macro {m} when am_req_i is 0: Got: {bp_wdata_n}"
 
-                expected_ready = (bp_gnt >> m) & 1
-                assert (stream_ready >> n) & 1 == expected_ready, f"Test {test_idx}: stream_ready_o mismatch on macro {m}"
+                expected_ready = (bp_gnt >> m) & 1 if expected_req == 1 else 0
+                assert (stream_ready >> n) & 1 == expected_ready, f"Test {test_idx}: stream_ready_o mismatch on macro {m}: Expected: {expected_ready} Got: {(stream_ready >> n) & 1}"
             else:
                 assert bp_req_m == 0, f"Test {test_idx}: bp_req_o should be 0 on unused macro {m}: Got: {bp_req_m}"
                 assert bp_addr_n == 0, f"Test {test_idx}: bp_addr_o should be 0 on unused macro {m}: Got: {bp_addr_n}"

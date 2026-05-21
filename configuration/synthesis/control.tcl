@@ -7,13 +7,15 @@
 
 set syn_config my
 
+set module "control"
+
 # Get Technology
 set technology [EDA::Technology::getTechnology 22fdsoi_plus]
 set pdk [$technology getPDK]
 
 $syn_config setTechnology $technology
 
-$syn_config setDesignTopModulePath "apb_pmc"
+$syn_config setDesignTopModulePath $module
 
 # Get Metal Stack
 $pdk setMetalStack 10M_2Mx_5Cx_1Jx_2Qx_LB 19
@@ -34,13 +36,29 @@ $stdc addTimingConditions $stdc_timing_conditions
 
 
 # Parameters
-#$syn_config addParameter APB_BIT_WIDTH 32
+set bottle_dir "/local/hageltom/teda/bottles/risc-v-streaming"
+set allowed_params [list \
+  N_STREAMS \
+  M_MACROS \
+  DATA_WIDTH \
+  ADDR_WIDTH \
+  MACRO_DEPTH \
+  B_BANKS \
+]
+source [file normalize [file join $bottle_dir "configuration" "params.tcl"]]
+dict for {param value} $::params {
+  if {$param in $allowed_params} {
+      $syn_config addParameter $param [string cat $value]
+  } else {
+      puts "\[TEDA-INFO\] Skipping parameter $param (not used in $module)"
+  }
+}
 
 # Add component
-$syn_config addComponent [EDA::Design::getComponent "mock_streaming"] top
+$syn_config addComponent [EDA::Design::getComponent $module] top
 
 # Add Mode
-set mode [EDA::Design::createMode mode [list mock_streaming.sdc] [list]]
+set mode [EDA::Design::createMode mode [list constraints.sdc] [list]]
 
 # Add Corner
 set pvt_corner [EDA::Design::createPVTCorner typ [EDA::PVTProcess::TT] 0.8 25 [list TT_0P80V_0P00V_0P00V_0P00V_25C]]

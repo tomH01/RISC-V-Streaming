@@ -32,7 +32,8 @@ module fwft_fifo #(
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-      count_q <= '0;
+      mem      <= '{default:'0};
+      count_q  <= '0;
       wr_ptr_q <= '0;
       rd_ptr_q <= '0;
     end else begin
