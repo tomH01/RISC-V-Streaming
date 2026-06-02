@@ -11,6 +11,12 @@ module job_manager #(
   input logic clk_i,
   input logic rst_ni,
 
+  // Debug IF TODO: Remove after Testing
+  output logic [N_STREAMS-1:0] dbg_arb_gnt_o,
+  output logic                 dbg_arb_valid_o,
+  output logic                 dbg_us_job_ready_o,
+  output logic                 dbg_us_job_valid_o,
+
   // Notification IF
   input logic                       notif_valid_i       [N_STREAMS],
   input logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_i [N_STREAMS],
@@ -63,7 +69,7 @@ module job_manager #(
   logic                 arb_valid;
 
   rr_arbiter #(
-    .N(N_STREAMS)
+    .NUM_REQS(N_STREAMS)
   ) u_stream_arbiter (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
@@ -198,5 +204,11 @@ module job_manager #(
     .ds_valid_o(job_req_o.valid),
     .ds_data_o(job_req_o.pkt)
   );
+
+  // Debug TODO: Remove after Testing
+  assign dbg_arb_gnt_o       = stream_gnt_vec;
+  assign dbg_arb_valid_o     = arb_valid;
+  assign dbg_us_job_ready_o  = us_job_ready;
+  assign dbg_us_job_valid_o  = us_job_valid;
 
 endmodule

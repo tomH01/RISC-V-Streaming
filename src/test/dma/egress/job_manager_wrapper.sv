@@ -11,6 +11,12 @@ module job_manager_wrapper #(
   input logic clk_i,
   input logic rst_ni,
 
+  // Debug IF TODO: Remove after Testing
+  output logic [N_STREAMS-1:0] dbg_arb_gnt_o,
+  output logic                 dbg_arb_valid_o,
+  output logic                 dbg_us_job_ready_o,
+  output logic                 dbg_us_job_valid_o,
+
   // Notification IF
   input logic                       notif_valid_i       [N_STREAMS],
   input logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_i [N_STREAMS],
@@ -48,6 +54,12 @@ module job_manager_wrapper #(
   ) dut (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
+
+    // Debug TODO: Remove after Testing
+    .dbg_arb_gnt_o(dbg_arb_gnt_o),
+    .dbg_arb_valid_o(dbg_arb_valid_o),
+    .dbg_us_job_ready_o(dbg_us_job_ready_o),
+    .dbg_us_job_valid_o(dbg_us_job_valid_o),
 
     .notif_valid_i(notif_valid_i),
     .notif_start_macro_i(notif_start_macro_i),

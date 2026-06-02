@@ -9,6 +9,8 @@ from cocotb.queue import Queue
 from cocotb.triggers import ClockCycles, RisingEdge, ReadOnly
 from cocotb.clock import Clock
 
+from get_param import get_param
+
 
 class L2AllocatorDriver:
     def __init__(self, dut, b_banks, w_workers):   
@@ -117,12 +119,12 @@ class L2AllocatorDriver:
     
     
 class GoldenModel:
-    def __init__(self, dut, score_board):
+    def __init__(self, dut, score_board, b_banks, w_workers):
         self.dut = dut
         self.scoreboard = score_board
         
-        self.b_banks = int(self.dut.B_BANKS)
-        self.w_workers = int(self.dut.W_WORKERS)
+        self.b_banks = b_banks
+        self.w_workers = w_workers
         self.bank_header_size = None
         self.bank_limit = None
         self.bank_bases = None
@@ -300,12 +302,12 @@ async def test_l2_allocator_crv(dut):
     rnd.seed(42)
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start()) 
     
-    b_banks = int(dut.B_BANKS.value)
-    w_workers = int(dut.W_WORKERS.value)
+    b_banks = get_param(dut, "B_BANKS")
+    w_workers = get_param(dut, "W_WORKERS")
     
     driver = L2AllocatorDriver(dut, b_banks, w_workers)
     score_board = Scoreboard(dut)
-    golden_model = GoldenModel(dut, score_board)
+    golden_model = GoldenModel(dut, score_board, b_banks, w_workers)
     output_monitor = OutputMonitor(dut, score_board)
     
     for i in range(100):

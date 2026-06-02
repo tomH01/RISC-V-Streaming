@@ -4,18 +4,20 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly
 
+from get_param import get_param
+
 
 class StridedAddrGenDriver:
-    def __init__(self, dut):
+    def __init__(self, dut, count_width, stride_width, num_axes):
         self.dut = dut
         self.dut.job_start_i.value = 0
         self.dut.req_i.value = 0
         self.dut.base_addr_i.value = 0
         self.dut.payload_i.value = 0
         
-        self.count_width = self.dut.COUNT_WIDTH.value
-        self.stride_width = self.dut.STRIDE_WIDTH.value
-        self.num_axes = self.dut.NUM_AXES.value
+        self.count_width = count_width
+        self.stride_width = stride_width
+        self.num_axes = num_axes
 
     async def reset(self):
         self.dut.rst_ni.value = 0
@@ -100,7 +102,11 @@ async def test_strided_addr_gen(dut):
     rnd.seed(42)
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
-    driver = StridedAddrGenDriver(dut)
+    count_width = get_param(dut, "COUNT_WIDTH")
+    stride_width = get_param(dut, "STRIDE_WIDTH")
+    num_axes = get_param(dut, "NUM_AXES")
+    
+    driver = StridedAddrGenDriver(dut, count_width, stride_width, num_axes)
     await driver.reset()
     
     NUM_JOBS = 10

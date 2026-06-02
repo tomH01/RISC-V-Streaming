@@ -9,6 +9,8 @@ from cocotb.queue import Queue
 from cocotb.triggers import ClockCycles, RisingEdge, ReadOnly
 from cocotb.clock import Clock
 
+from get_param import get_param
+
 class JobManagerDriver:
     def __init__(self, dut, n_streams):
         self.dut = dut
@@ -95,9 +97,9 @@ class GoldenModel:
                         st['current_cfg'] = cfg
                         st['apply_counter'] = 0
             
-            gnt_val = self.dut.dut.u_stream_arbiter.gnt_o.value.integer
-            arb_valid = self.dut.dut.u_stream_arbiter.valid_o.value.integer
-            us_ready = self.dut.dut.us_job_ready.value.integer
+            gnt_val = self.dut.dbg_arb_gnt_o.value.integer
+            arb_valid = self.dut.dbg_arb_valid_o.value.integer
+            us_ready = self.dut.dbg_us_job_ready_o.value.integer
             
             if arb_valid and us_ready and gnt_val > 0:
                 grant_id = int(math.log2(gnt_val))
@@ -205,9 +207,12 @@ async def test_job_manager_crv(dut):
     rnd.seed(42)
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
-    n_streams = int(dut.N_STREAMS.value)
+    n_streams = get_param(dut, "N_STREAMS")
+    fifo_depth = get_param(dut, "FIFO_DEPTH")
+    m_macros = get_param(dut, "M_MACROS")
+
     score_board = Scoreboard()
-    golden_model = GoldenModel(dut, score_board, n_streams, int(dut.FIFO_DEPTH.value))
+    golden_model = GoldenModel(dut, score_board, n_streams, fifo_depth)
     driver = JobManagerDriver(dut, n_streams)
     output_monitor = OutputMonitor(dut, score_board)
     
@@ -231,7 +236,7 @@ async def test_job_manager_crv(dut):
                 st = golden_model.state[stream_id]
 
                 if rnd.random() < 0.4 and len(st['notif_fifo']) < golden_model.fifo_depth:
-                    start_macro = rnd.randint(0, dut.M_MACROS.value - 1)
+                    start_macro = rnd.randint(0, m_macros - 1)
                     await driver.send_notification(stream_id, start_macro)
                     
                     
@@ -261,7 +266,7 @@ async def test_job_manager_crv(dut):
         while True:
             await RisingEdge(dut.clk_i)
             if int(dut.job_valid_o.value) == 0 and \
-               int(dut.dut.us_job_valid.value) == 0:
+               int(dut.dbg_us_job_valid_o.value) == 0:
                 await ClockCycles(dut.clk_i, 2)
                 break
             

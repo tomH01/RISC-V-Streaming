@@ -1,10 +1,10 @@
 module l2_allocator_wrapper #(
-  parameter int DATA_WIDTH    = 32,
-  parameter int ADDR_WIDTH    = 32,
-  parameter int W_WORKERS     = 4,
-  parameter int B_BANKS       = 2,
   parameter int N_STREAMS     = 4,
   parameter int M_MACROS      = 8,
+  parameter int DATA_WIDTH    = 32,
+  parameter int ADDR_WIDTH    = 32,
+  parameter int W_WORKERS     = 2,
+  parameter int B_BANKS       = 2,
 
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),

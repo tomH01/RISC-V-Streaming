@@ -8,3 +8,8 @@ dict set ::params DATA_WIDTH 32
 dict set ::params DEPTH 8
 dict set ::params NUM_REQS 4
 dict set ::params NUM_READ_PORTS 2
+dict set ::params W_WORKERS 2
+dict set ::params FIFO_DEPTH 8
+dict set ::params STRIDE_WIDTH 14
+dict set ::params COUNT_WIDTH 10
+dict set ::params NUM_AXES 4
