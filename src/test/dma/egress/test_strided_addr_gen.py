@@ -46,6 +46,24 @@ class StridedAddrGenDriver:
             payload |= axis_bits << (i * axis_width)
         
         return payload
+    
+    def unpack_payload(self, payload):
+        strides = []
+        counts = []
+        
+        stride_mask = (1 << self.stride_width) - 1
+        count_mask = (1 << self.count_width) - 1
+        axis_width = self.stride_width + self.count_width
+        
+        for i in range(self.num_axes):
+            shifted_payload = payload >> (i * axis_width)
+            count = shifted_payload & count_mask
+            stride = (shifted_payload >> self.count_width) & stride_mask
+            
+            strides.append(stride)
+            counts.append(count)
+        
+        return strides, counts
         
         
 @cocotb.test()
@@ -71,7 +89,9 @@ async def test_strided_addr_gen(dut):
         payload = driver.pack_payload(strides, counts)
         await driver.initialize(base_addr, payload)
         
-        golden_model = StridedGeneratorModel(base_addr, payload, count_width, stride_width, num_axes)
+        strides, counts = driver.unpack_payload(payload)
+        golden_model = StridedGeneratorModel(count_width, stride_width, num_axes)
+        golden_model.initialize(strides, counts, base_addr)
         
         await RisingEdge(dut.clk_i)
         
