@@ -5,7 +5,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly
 
 from get_param import get_param
-from strided_generator_model import StridedGeneratorModel
+from addr_generator_models import StridedGeneratorModel
 
 
 class StridedAddrGenDriver:
