@@ -151,7 +151,7 @@ $strided_addr_gen addHDLSourceFiles [list \
 ]
 
 $strided_addr_gen addPythonSimFiles [concat $global_sim_files [list \
-  "src/test/tools/strided_generator_model.py" \
+  "src/test/tools/addr_generator_models.py" \
   "src/test/dma/egress/test_strided_addr_gen.py" \
 ]]
 
