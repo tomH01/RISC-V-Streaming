@@ -5,6 +5,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly
 
 from get_param import get_param
+from strided_generator_model import StridedGeneratorModel
 
 
 class StridedAddrGenDriver:
@@ -45,56 +46,6 @@ class StridedAddrGenDriver:
             payload |= axis_bits << (i * axis_width)
         
         return payload
-    
-    def unpack_payload(self, payload):
-        strides = []
-        counts = []
-        
-        stride_mask = (1 << self.stride_width) - 1
-        count_mask = (1 << self.count_width) - 1
-        axis_width = self.stride_width + self.count_width
-        
-        for i in range(self.num_axes):
-            shifted_payload = payload >> (i * axis_width)
-            count = shifted_payload & count_mask
-            stride = (shifted_payload >> self.count_width) & stride_mask
-            
-            strides.append(stride)
-            counts.append(count)
-        
-        return strides, counts
-            
-        
-class GoldenModel:
-    def __init__(self, base_addr, payload, driver):
-        self.base_addr = base_addr
-        self.payload = payload
-        self.driver = driver
-
-        self.current_addr = base_addr
-        
-        strides, counts = self.driver.unpack_payload(payload)
-        self.strides = strides
-        self.counts = counts
-        self.counters = [0 for _ in range(self.driver.num_axes)]      
-    
-    def step(self):
-        out_addr = self.current_addr
-        
-        for i in range(self.driver.num_axes):
-            self.counters[i] += 1
-            
-            if self.counters[i] < self.counts[i]:
-                break
-            else:
-                self.counters[i] = 0
-    
-        next_addr = self.base_addr
-        for i in range(self.driver.num_axes):
-            next_addr += self.counters[i] * self.strides[i]
-            
-        self.current_addr = next_addr
-        return out_addr    
         
         
 @cocotb.test()
@@ -120,7 +71,7 @@ async def test_strided_addr_gen(dut):
         payload = driver.pack_payload(strides, counts)
         await driver.initialize(base_addr, payload)
         
-        golden = GoldenModel(base_addr, payload, driver)
+        golden_model = StridedGeneratorModel(base_addr, payload, count_width, stride_width, num_axes)
         
         await RisingEdge(dut.clk_i)
         
@@ -135,7 +86,7 @@ async def test_strided_addr_gen(dut):
                 driver.dut.req_i.value = 1   
             
                 await ReadOnly()
-                golden_addr = golden.step()           
+                golden_addr = golden_model.step()           
                 dut_addr = int(driver.dut.addr_o.value)
 
                 assert dut_addr == golden_addr, f"Expected {golden_addr}, got {dut_addr}"
