@@ -52,7 +52,7 @@ class GoldenModel:
     def process_job(self, job, bp_data):
         # TODO: get those somehow
         self.gen_bp_transactions(job)
-        self.gen_bus_transactions()
+        self.gen_bus_transactions(bp_data)
         
     def gen_bp_transactions(self, job):
         window_size = job['window_size']
@@ -62,9 +62,18 @@ class GoldenModel:
         generator.initialize(config_payload)
         
         for _ in range(window_size):
-            generator.step()
+            addr = generator.step()
+            
+            expected = {
+                    "addr": int(self.dut.bp_addr_o.value),
+                    "macro_sel": int(self.dut.bp_macro_sel_o.value)
+                }
+            
+            
+            
+            
         
-    def gen_bus_transactions(self):
+    def gen_bus_transactions(self, bp_data):
         pass
     
     def get_generators(self):
