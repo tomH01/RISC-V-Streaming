@@ -10,6 +10,7 @@ module address_generator #(
   localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
   localparam int OFFSET_WIDTH     = $clog2(MACRO_DEPTH),
+  localparam int MACRO_CNT_WIDTH  = $clog2(M_MACROS + 1),
   localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
   localparam int WIDTH_SHIFT      = $clog2(DATA_WIDTH_BYTES),
   localparam int NUM_MODES        = 16
@@ -31,9 +32,8 @@ module address_generator #(
   output logic [M_MACROS-1:0]        bp_release_o,
   output logic                       bp_req_o,
   output logic [ADDR_WIDTH-1:0]      bp_addr_o,
-  output logic [MACRO_PTR_WIDTH-1:0] bp_macro_select_o,
+  output logic [MACRO_PTR_WIDTH-1:0] bp_macro_sel_o,
   input  logic                       bp_gnt_i,
-  input  logic                       bp_r_opc_i,
   input  logic [DATA_WIDTH-1:0]      bp_r_rdata_i,
   input  logic                       bp_r_valid_i,
 
@@ -67,11 +67,14 @@ module address_generator #(
   logic [ADDR_WIDTH-1:0]       base_addr_q,      base_addr_d;
   logic [BANK_PTR_WIDTH-1:0]   bank_idx_q,       bank_idx_d;
 
-  logic [ADDR_WIDTH-1:0]      word_cnt_q,          word_cnt_d;
-  logic [MACRO_PTR_WIDTH-1:0] num_macros_needed_q, num_macros_needed_d;
+  logic [ADDR_WIDTH-1:0]      req_cnt_q,      req_cnt_d;
+  logic [ADDR_WIDTH-1:0]      bus_cnt_q,      bus_cnt_d;
+  logic [3:0]                 inflight_cnt_q, inflight_cnt_d;
+
+  logic [MACRO_CNT_WIDTH-1:0] num_macros_needed_q, num_macros_needed_d;
   logic [MACRO_PTR_WIDTH-1:0] macro_table_q [M_MACROS/2]; 
   logic [MACRO_PTR_WIDTH-1:0] macro_table_d [M_MACROS/2];
-  logic [MACRO_PTR_WIDTH-1:0] prep_cnt_q,   prep_cnt_d;
+  logic [MACRO_CNT_WIDTH-1:0] prep_cnt_q,   prep_cnt_d;
   logic [M_MACROS-1:0]        macro_mask_q, macro_mask_d;
 
   logic [ADDR_WIDTH-1:0] current_addr;
@@ -79,18 +82,19 @@ module address_generator #(
   logic                  can_issue_req;
   logic                  skid_ready;
 
-  assign can_issue_req     = (state_q == RUN) && skid_ready && bus_ready_i;
+  assign can_issue_req     = (state_q == RUN) && skid_ready && (req_cnt_q < window_size_q);
 
   assign bp_addr_o         = current_addr[OFFSET_WIDTH-1:0];
-  assign bp_macro_select_o = macro_table_q[current_addr >> OFFSET_WIDTH];
+  assign bp_macro_sel_o    = macro_table_q[current_addr >> OFFSET_WIDTH];
   assign bp_req_o          = can_issue_req;
 
-  assign bus_addr_o        = base_addr_q + (word_cnt_q << WIDTH_SHIFT);
+  assign bus_addr_o        = base_addr_q + (bus_cnt_q << WIDTH_SHIFT);
 
   // AGU State Machine
   always_comb begin
     state_d             = state_q;
-    word_cnt_d          = word_cnt_q;
+    req_cnt_d           = req_cnt_q;
+    bus_cnt_d           = bus_cnt_q;
     num_macros_needed_d = num_macros_needed_q;
     macro_table_d       = macro_table_q;
     prep_cnt_d          = prep_cnt_q;
@@ -111,7 +115,8 @@ module address_generator #(
     case (state_q)
       IDLE: begin
         if (sel_i && job_assign_i.valid) begin
-          word_cnt_d = '0;
+          req_cnt_d = '0;
+          bus_cnt_d = '0;
           job_start  = 1'b1;
 
           num_macros_needed_d = MACRO_PTR_WIDTH'((job_assign_i.pkt.window_size + (MACRO_DEPTH - 1)) >> OFFSET_WIDTH);
@@ -148,18 +153,23 @@ module address_generator #(
 
       RUN: begin
         job_start = 1'b0;
-        // Ask Bus 
+        // Prefetch BP 
         if (can_issue_req && bp_gnt_i) begin
-          if (word_cnt_q == (window_size_q - 1)) begin
+          req_cnt_d = req_cnt_q + 1;
+        end
+
+        // Bus transaction
+        if (bus_valid_o && bus_ready_i) begin
+          if (bus_cnt_q == window_size_q - 1) begin
             state_d = FINISH;
           end else begin
-            word_cnt_d = word_cnt_q + 1;
+            bus_cnt_d = bus_cnt_q + 1;
           end
         end
       end
 
       FINISH: begin
-        if (inflight_cnt_d == 0) begin
+        if (inflight_cnt_q == 0) begin
           macro_mask_d = '0; 
           done_o       = 1'b1;
           state_d      = IDLE;
@@ -177,8 +187,8 @@ module address_generator #(
   logic [ADDR_WIDTH-1:0] addr_all [NUM_MODES];
   logic [NUM_MODES-1:0]  req_all;
 
-  assign addr_all[MODE_LINEAR] = (word_cnt_q << WIDTH_SHIFT);
-  assign req_all               = NUM_MODES'(can_issue_req) << agu_mode_q;
+  assign addr_all[MODE_LINEAR] = (req_cnt_q << WIDTH_SHIFT);
+  assign req_all               = NUM_MODES'(can_issue_req && bp_gnt_i) << agu_mode_q;
 
   strided_addr_gen #(
     .ADDR_WIDTH(ADDR_WIDTH)
@@ -199,9 +209,6 @@ module address_generator #(
       default:      current_addr = addr_all[MODE_LINEAR];
     endcase
   end
-
-  // In-flight Request Tracking
-  logic [3:0] inflight_cnt_q, inflight_cnt_d;
 
   always_comb begin
     inflight_cnt_d = inflight_cnt_q;
@@ -240,7 +247,8 @@ module address_generator #(
       base_addr_q      <= '0;
       bank_idx_q       <= '0;
 
-      word_cnt_q          <= '0;
+      req_cnt_q           <= '0;
+      bus_cnt_q           <= '0;
       num_macros_needed_q <= '0;
       macro_table_q       <= '{default:'0};
       prep_cnt_q          <= '0;
@@ -259,7 +267,8 @@ module address_generator #(
       base_addr_q      <= base_addr_d;
       bank_idx_q       <= bank_idx_d;
 
-      word_cnt_q          <= word_cnt_d;
+      req_cnt_q           <= req_cnt_d;
+      bus_cnt_q           <= bus_cnt_d;
       num_macros_needed_q <= num_macros_needed_d;
       macro_table_q       <= macro_table_d;
       prep_cnt_q          <= prep_cnt_d;

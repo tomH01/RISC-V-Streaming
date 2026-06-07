@@ -20,13 +20,12 @@ module egress_top #(
 
   // Buffer Pool IF
   input  logic [W_WORKERS-1:0]       bp_gnt_i,
-  input  logic [W_WORKERS-1:0]       bp_r_opc_o,
-  input  logic [DATA_WIDTH-1:0]      bp_r_rdata_o      [W_WORKERS],
+  input  logic [DATA_WIDTH-1:0]      bp_r_rdata_o   [W_WORKERS],
   input  logic [W_WORKERS-1:0]       bp_r_valid_o,
   output logic [M_MACROS-1:0]        bp_release_o,
   output logic [W_WORKERS-1:0]       bp_req_o,
-  output logic [ADDR_WIDTH-1:0]      bp_addr_o         [W_WORKERS],
-  output logic [MACRO_PTR_WIDTH-1:0] bp_macro_select_o [W_WORKERS],
+  output logic [ADDR_WIDTH-1:0]      bp_addr_o      [W_WORKERS],
+  output logic [MACRO_PTR_WIDTH-1:0] bp_macro_sel_o [W_WORKERS],
   output logic [M_MACROS-1:0]        switch_state_o,
 
   // Control IF
@@ -150,9 +149,8 @@ module egress_top #(
         .bp_release_o(bp_release_all_o[i]),
         .bp_req_o(bp_req_o[i]),
         .bp_addr_o(bp_addr_o[i]),
-        .bp_macro_select_o(bp_macro_select_o[i]),
+        .bp_macro_sel_o(bp_macro_sel_o[i]),
         .bp_gnt_i(bp_gnt_i[i]),
-        .bp_r_opc_i(bp_r_opc_o[i]),
         .bp_r_rdata_i(bp_r_rdata_o[i]),
         .bp_r_valid_i(bp_r_valid_o[i]),
 

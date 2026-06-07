@@ -5,17 +5,25 @@ module address_generator_wrapper #(
   parameter int ADDR_WIDTH = 32,
   parameter int B_BANKS    = 2,
   parameter int MACRO_DEPTH = 256,
+
+  localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
+  localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
+  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS)
 )(
   input logic clk_i,
   input logic rst_ni,
 
   // Allocator IF
   input logic                      sel_i,
-  input logic                      job_assign_valid_i,
+
+  input logic                        job_assign_valid_i,
   input logic [STREAM_PTR_WIDTH-1:0] job_assign_stream_id,
+  input logic [MACRO_PTR_WIDTH-1:0]  job_assign_start_macro;
+  input logic [ADDR_WIDTH-1:0]       job_assign_window_size;
+  input logic [3:0]                  job_assign_mode;
+  input logic [15:0]                 job_assign_window_id;
+  input logic [95:0]                 job_assign_payload;
 
-
-  job_if.rx_push                   job_assign_i,
   input logic [ADDR_WIDTH-1:0]     job_addr_i,
   input logic [BANK_PTR_WIDTH-1:0] job_bank_i,
   output logic                     done_o,
@@ -29,7 +37,6 @@ module address_generator_wrapper #(
   output logic [ADDR_WIDTH-1:0]      bp_addr_o,
   output logic [MACRO_PTR_WIDTH-1:0] bp_macro_select_o,
   input  logic                       bp_gnt_i,
-  input  logic                       bp_r_opc_i,
   input  logic [DATA_WIDTH-1:0]      bp_r_rdata_i,
   input  logic                       bp_r_valid_i,
 
@@ -40,6 +47,51 @@ module address_generator_wrapper #(
   output logic [DATA_WIDTH-1:0] bus_wdata_o
 );
 
+  job_if #(
+    .N_STREAMS(N_STREAMS),
+    .M_MACROS(M_MACROS),
+    .ADDR_WIDTH(ADDR_WIDTH)
+  ) u_job_assign_if();
 
+  assign u_job_assign_if.valid           = job_assign_valid_i;
+  assign u_job_assign_if.pkt.stream_id   = job_assign_stream_id;
+  assign u_job_assign_if.pkt.start_macro = job_assign_start_macro;
+  assign u_job_assign_if.pkt.window_size = job_assign_window_size;
+  assign u_job_assign_if.pkt.mode        = job_assign_mode;
+  assign u_job_assign_if.pkt.window_id   = job_assign_window_id;
+  assign u_job_assign_if.pkt.payload     = job_assign_payload;
+
+  address_generator #(
+    .N_STREAMS(N_STREAMS),
+    .M_MACROS(M_MACROS),
+    .DATA_WIDTH(DATA_WIDTH),
+    .ADDR_WIDTH(ADDR_WIDTH),
+    .B_BANKS(B_BANKS),
+    .MACRO_DEPTH(MACRO_DEPTH)
+  ) u_address_generator (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+
+    .sel_i(sel_i),
+    .job_assign_i(u_job_assign_if.rx_push),
+    .job_addr_i(job_addr_i),
+    .job_bank_i(job_bank_i),
+    .done_o(done_o),
+
+    .next_pointer_i(next_pointer_i),
+
+    .bp_release_o(bp_release_o),
+    .bp_req_o(bp_req_o),
+    .bp_addr_o(bp_addr_o),
+    .bp_macro_select_o(bp_macro_select_o),
+    .bp_gnt_i(bp_gnt_i),
+    .bp_r_rdata_i(bp_r_rdata_i),
+    .bp_r_valid_i(bp_r_valid_i),
+
+    .bus_ready_i(bus_ready_i),
+    .bus_valid_o(bus_valid_o),
+    .bus_addr_o(bus_addr_o),
+    .bus_wdata_o(bus_wdata_o)
+  );
 
 endmodule

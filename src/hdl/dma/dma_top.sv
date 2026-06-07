@@ -134,7 +134,6 @@ module dma_top #(
   // Egress
 
   logic [NB_READ_PORTS-1:0]    egress_gnt;
-  logic [NB_READ_PORTS-1:0]    egress_r_opc;
   logic [DATA_WIDTH-1:0]       egress_r_rdata      [NB_READ_PORTS];
   logic [NB_READ_PORTS-1:0]    egress_r_valid;
   logic [M_MACROS-1:0]         egress_release;
@@ -156,13 +155,12 @@ module dma_top #(
     .notify_start_macro_i(notify_start_macro),
 
     .bp_gnt_i(egress_gnt),
-    .bp_r_opc_o(egress_r_opc),
     .bp_r_rdata_o(egress_r_rdata),
     .bp_r_valid_o(egress_r_valid),
     .bp_release_o(egress_release),
     .bp_req_o(egress_req),
     .bp_addr_o(egress_addr),
-    .bp_macro_select_o(egress_macro_select),
+    .bp_macro_sel_o(egress_macro_select),
     .switch_state_o(),
 
     .start_bank_idx_i(cfg_start_bank_idx),
@@ -209,7 +207,6 @@ module dma_top #(
     .egress_addr_i(egress_addr),
     .egress_macro_select_i(egress_macro_select),
     .egress_gnt_o(egress_gnt),
-    .egress_r_opc_o(egress_r_opc),
     .egress_r_rdata_o(egress_r_rdata),
     .egress_r_valid_o(egress_r_valid)
   );

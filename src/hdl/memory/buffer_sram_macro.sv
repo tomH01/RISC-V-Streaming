@@ -27,7 +27,6 @@ module buffer_sram_macro #() (
     output logic         gnt,
     // ################################
     // Bus Interface - RESPONSE CHANNEL
-    output logic         r_opc,
     output logic [31:0]  r_rdata,
     output logic         r_valid
 );
@@ -36,7 +35,6 @@ module buffer_sram_macro #() (
 
   // TCDM handshaking for constant 1 cycle latency
   assign gnt   = req;
-  assign r_opc = 1'b0;
 
   always_ff @(posedge clk_i, negedge rst_ni) begin
     if (!rst_ni) begin

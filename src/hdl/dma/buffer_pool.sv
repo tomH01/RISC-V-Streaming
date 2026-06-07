@@ -25,7 +25,6 @@ module buffer_pool #(
   input logic  [ADDR_WIDTH-1:0]      egress_addr_i         [NUM_READ_PORTS],
   input logic  [MACRO_PTR_WIDTH-1:0] egress_macro_select_i [NUM_READ_PORTS],
   output logic [NUM_READ_PORTS-1:0]  egress_gnt_o,
-  output logic [NUM_READ_PORTS-1:0]  egress_r_opc_o,
   output logic [DATA_WIDTH-1:0]      egress_r_rdata_o [NUM_READ_PORTS],
   output logic [NUM_READ_PORTS-1:0]  egress_r_valid_o
 );
@@ -34,7 +33,6 @@ module buffer_pool #(
 
   logic [3:0]            macro_be      [M_MACROS]; 
   logic [M_MACROS-1:0]   macro_gnt;
-  logic [M_MACROS-1:0]   macro_r_opc;
   logic [DATA_WIDTH-1:0] macro_r_rdata [M_MACROS];
   logic [M_MACROS-1:0]   macro_r_valid;
 
@@ -72,7 +70,6 @@ module buffer_pool #(
   always_comb begin
     for (int p = 0; p < NUM_READ_PORTS; p++) begin
       egress_gnt_o[p]     = macro_gnt[egress_macro_select_i[p]];
-      egress_r_opc_o[p]   = macro_r_opc[egress_macro_select_q[p]];
       egress_r_rdata_o[p] = macro_r_rdata[egress_macro_select_q[p]];
       egress_r_valid_o[p] = macro_r_valid[egress_macro_select_q[p]];
     end
@@ -118,7 +115,6 @@ module buffer_pool #(
         
         .wdata(ingress_wdata_i[i]),
 
-        .r_opc(macro_r_opc[i]),
         .r_rdata(macro_r_rdata[i]),
         .r_valid(macro_r_valid[i])    
       );
