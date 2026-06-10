@@ -7,7 +7,6 @@
 
 set sim_config my
 
-set module "ingress_top"
 
 # Set technology
 set technology [EDA::Technology::getTechnology "22fdsoi"]

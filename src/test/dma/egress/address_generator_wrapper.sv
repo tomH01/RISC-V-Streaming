@@ -14,15 +14,15 @@ module address_generator_wrapper #(
   input logic rst_ni,
 
   // Allocator IF
-  input logic                      sel_i,
+  input logic                        sel_i,
 
   input logic                        job_assign_valid_i,
-  input logic [STREAM_PTR_WIDTH-1:0] job_assign_stream_id,
-  input logic [MACRO_PTR_WIDTH-1:0]  job_assign_start_macro;
-  input logic [ADDR_WIDTH-1:0]       job_assign_window_size;
-  input logic [3:0]                  job_assign_mode;
-  input logic [15:0]                 job_assign_window_id;
-  input logic [95:0]                 job_assign_payload;
+  input logic [STREAM_PTR_WIDTH-1:0] job_assign_stream_id_i,
+  input logic [MACRO_PTR_WIDTH-1:0]  job_assign_start_macro_i,
+  input logic [ADDR_WIDTH-1:0]       job_assign_window_size_i,
+  input logic [3:0]                  job_assign_mode_i,
+  input logic [15:0]                 job_assign_window_id_i,
+  input logic [95:0]                 job_assign_payload_i,
 
   input logic [ADDR_WIDTH-1:0]     job_addr_i,
   input logic [BANK_PTR_WIDTH-1:0] job_bank_i,
@@ -54,12 +54,12 @@ module address_generator_wrapper #(
   ) u_job_assign_if();
 
   assign u_job_assign_if.valid           = job_assign_valid_i;
-  assign u_job_assign_if.pkt.stream_id   = job_assign_stream_id;
-  assign u_job_assign_if.pkt.start_macro = job_assign_start_macro;
-  assign u_job_assign_if.pkt.window_size = job_assign_window_size;
-  assign u_job_assign_if.pkt.mode        = job_assign_mode;
-  assign u_job_assign_if.pkt.window_id   = job_assign_window_id;
-  assign u_job_assign_if.pkt.payload     = job_assign_payload;
+  assign u_job_assign_if.pkt.stream_id   = job_assign_stream_id_i;
+  assign u_job_assign_if.pkt.start_macro = job_assign_start_macro_i;
+  assign u_job_assign_if.pkt.window_size = job_assign_window_size_i;
+  assign u_job_assign_if.pkt.mode        = job_assign_mode_i;
+  assign u_job_assign_if.pkt.window_id   = job_assign_window_id_i;
+  assign u_job_assign_if.pkt.payload     = job_assign_payload_i;
 
   address_generator #(
     .N_STREAMS(N_STREAMS),

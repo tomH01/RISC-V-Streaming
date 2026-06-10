@@ -119,8 +119,8 @@ set job_manager_wrapper [EDA::Design::createComponent job_manager_wrapper]
 
 $job_manager_wrapper addHDLSourceFiles [list \
   "src/hdl/dma/egress/job_if.sv" \
-  "src/test/dma/egress/job_manager_wrapper.sv" \
   "src/hdl/dma/egress/job_manager.sv" \
+  "src/test/dma/egress/job_manager_wrapper.sv" \
   "src/hdl/common/mem/fwft_fifo.sv" \
   "src/hdl/common/arb/rr_arbiter.sv" \
   "src/hdl/common/flow_control/skid_buffer.sv" \
@@ -153,6 +153,19 @@ $strided_addr_gen addHDLSourceFiles [list \
 $strided_addr_gen addPythonSimFiles [concat $global_sim_files [list \
   "src/test/tools/addr_generator_models.py" \
   "src/test/dma/egress/test_strided_addr_gen.py" \
+]]
+
+
+set address_generator_wrapper [EDA::Design::createComponent address_generator_wrapper]
+$address_generator_wrapper addHDLSourceFiles [list \
+  "src/hdl/dma/egress/strided_addr_gen.sv" \
+  "src/hdl/dma/egress/address_generator.sv" \
+  "src/test/dma/egress/address_generator_wrapper.sv" \
+]
+$address_generator_wrapper addPythonSimFiles [concat $global_sim_files [list \
+  "src/test/tools/addr_generator_models.py" \
+  "src/test/tools/config_randomizer.py" \
+  "src/test/dma/egress/test_address_generator.py" \
 ]]
 
 
