@@ -7,7 +7,19 @@
 
 set sim_config my
 
-set module "ingress_top"
+
+if { [EDA::hasTedaEnvironmentParameter MODULE]} {
+  set module [EDA::getTedaEnvironmentParameter MODULE]
+} else {
+  error "MODULE environment parameter not set"
+}
+
+# Parameters
+set bottle_dir "/local/hageltom/teda/bottles/risc-v-streaming"
+source [file normalize [file join $bottle_dir "configuration" "params.tcl"]]
+dict for {param value} $::params {
+  $sim_config addDesignParameter $param [string cat $value]
+}
 
 # Set technology
 set technology [EDA::Technology::getTechnology "22fdsoi"]
@@ -24,7 +36,6 @@ $sim_config setDefaultTimescale "1ps/1ps"
 
 # Components
 $sim_config addComponent [EDA::Design::getComponent $module] top
-
 
 $technology getIO "synopsys" dwc_io_gf22fdx_1p8v_gpio_i_ag1
 #$technology getSTDC "synopsys" gf22nspllogl36hdl116f

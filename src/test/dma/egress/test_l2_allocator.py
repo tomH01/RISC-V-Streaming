@@ -9,7 +9,9 @@ from cocotb.queue import Queue
 from cocotb.triggers import ClockCycles, RisingEdge, ReadOnly
 from cocotb.clock import Clock
 
-from get_param import get_param
+from utils.python.cocotb import get_design_parameters
+
+params = get_design_parameters()
 
 
 class L2AllocatorDriver:
@@ -302,8 +304,8 @@ async def test_l2_allocator_crv(dut):
     rnd.seed(42)
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start()) 
     
-    b_banks = get_param(dut, "B_BANKS")
-    w_workers = get_param(dut, "W_WORKERS")
+    b_banks = int(params.get("B_BANKS"))
+    w_workers = int(params.get("W_WORKERS"))
     
     driver = L2AllocatorDriver(dut, b_banks, w_workers)
     score_board = Scoreboard(dut)

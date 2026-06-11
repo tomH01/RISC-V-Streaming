@@ -8,13 +8,18 @@
 
 set sim_config my
 
-set module "ingress_top"
+if { [EDA::hasTedaEnvironmentParameter MODULE]} {
+  set module [EDA::getTedaEnvironmentParameter MODULE]
+} else {
+  error "MODULE environment parameter not set"
+}
+
 
 # Parameters
 set bottle_dir "/local/hageltom/teda/bottles/risc-v-streaming"
 source [file normalize [file join $bottle_dir "configuration" "params.tcl"]]
 dict for {param value} $::params {
-    $sim_config addParameter $param $value
+    $sim_config addDesignParameter $param $value
 }
 
 
@@ -23,7 +28,7 @@ $sim_config setDesignTopModulePath $module
 $sim_config setSimulationTopModulePath $module
 
 # Add reference to synthesis
-set syn_config [EDA::Synthesis::getConfiguration $module]
+set syn_config [EDA::Synthesis::getStoredConfiguration $module]
 $sim_config addReferencedConfiguration $syn_config
 
 # Set timescale
