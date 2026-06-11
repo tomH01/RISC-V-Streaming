@@ -19,6 +19,7 @@ class StridedAddrGenDriver:
         self.count_width = count_width
         self.stride_width = stride_width
         self.num_axes = num_axes
+        
 
     async def reset(self):
         self.dut.rst_ni.value = 0

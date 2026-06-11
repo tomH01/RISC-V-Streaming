@@ -84,7 +84,7 @@ module address_generator #(
 
   assign can_issue_req     = (state_q == RUN) && skid_ready && (req_cnt_q < window_size_q);
 
-  assign bp_addr_o         = current_addr[OFFSET_WIDTH-1:0];
+  assign bp_addr_o         = current_addr[OFFSET_WIDTH-1:0] << WIDTH_SHIFT;
   assign bp_macro_sel_o    = macro_table_q[current_addr >> OFFSET_WIDTH];
   assign bp_req_o          = can_issue_req;
 
@@ -187,7 +187,7 @@ module address_generator #(
   logic [ADDR_WIDTH-1:0] addr_all [NUM_MODES];
   logic [NUM_MODES-1:0]  req_all;
 
-  assign addr_all[MODE_LINEAR] = (req_cnt_q << WIDTH_SHIFT);
+  assign addr_all[MODE_LINEAR] = req_cnt_q;
   assign req_all               = NUM_MODES'(can_issue_req && bp_gnt_i) << agu_mode_q;
 
   strided_addr_gen #(

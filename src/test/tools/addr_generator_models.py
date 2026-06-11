@@ -1,3 +1,5 @@
+import random as rnd
+
 from enum import IntEnum
 
 class Mode(IntEnum):
@@ -86,3 +88,63 @@ class StridedGeneratorModel:
             counts.append(count)
         
         return strides, counts
+    
+    def generate_payload(self, window_size):
+        if window_size <= 0:
+            raise ValueError("Window size must be greater than 0.")
+        
+        factors = self._factorize(window_size)
+        counts = self._partition_factors(factors)
+        strides_canonical = self._get_canonical_strides(counts)
+        
+        axis_pairs = list(zip(strides_canonical, counts))
+        rnd.shuffle(axis_pairs)
+        shuffled_strides, shuffled_counts = zip(*axis_pairs)
+        return self.pack_payload(shuffled_strides, shuffled_counts)
+    
+    def _factorize(self, n):
+        """ based on trial division method """
+        factors = []
+        d = 2
+        temp = n
+        while d * d <= temp:
+            while temp % d == 0:
+                factors.append(d)
+                temp //= d
+            d += 1
+        if temp > 1:
+            factors.append(temp)
+        return factors
+    
+    def _partition_factors(self, factors):
+        counts = [1] * self.num_axes
+        for factor in factors:
+            counts[rnd.randrange(self.num_axes)] *= factor
+        return counts
+            
+    def _get_canonical_strides(self, counts):
+        strides = []
+        current_stride = 1
+        for count in counts:
+            strides.append(current_stride)
+            current_stride *= count
+        return strides         
+    
+    
+def main():
+    window_size = 10
+    
+    agu = StridedGeneratorModel(count_width=14, stride_width=10, num_axes=4)
+    agu.initialize(agu.generate_payload(window_size))
+
+    addrs = []
+    for _ in range(window_size):
+        addr = agu.step()
+        assert addr not in addrs, f"Duplicate address generated: {addr}"
+        assert addr < window_size
+        addrs.append(addr)
+        
+    print(f"Generated addresses: {addrs}")    
+
+if __name__ == "__main__":
+    main()
