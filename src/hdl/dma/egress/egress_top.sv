@@ -4,7 +4,7 @@ module egress_top #(
   parameter int DATA_WIDTH = 32,
   parameter int ADDR_WIDTH  = 32,
   parameter int W_WORKERS  = 2,
-  parameter int B_BANKS    = 2
+  parameter int B_BANKS    = 2,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
@@ -15,8 +15,8 @@ module egress_top #(
   input logic rst_ni,
 
   // Ingress IF
-  input logic [N_STREAMS-1:0]        notify_valid_i,
-  input logic [MACRO_PTR_WIDTH-1:0]  notify_start_macro_i [N_STREAMS],
+  input logic [N_STREAMS-1:0]        notif_valid_i,
+  input logic [MACRO_PTR_WIDTH-1:0]  notif_start_macro_i [N_STREAMS],
 
   // Buffer Pool IF
   input  logic [W_WORKERS-1:0]       bp_gnt_i,
@@ -26,7 +26,6 @@ module egress_top #(
   output logic [W_WORKERS-1:0]       bp_req_o,
   output logic [ADDR_WIDTH-1:0]      bp_addr_o      [W_WORKERS],
   output logic [MACRO_PTR_WIDTH-1:0] bp_macro_sel_o [W_WORKERS],
-  output logic [M_MACROS-1:0]        switch_state_o,
 
   // Control IF
   input logic                  start_bank_idx_i,
@@ -39,14 +38,14 @@ module egress_top #(
   input logic [MACRO_PTR_WIDTH-1:0] start_macro_i  [N_STREAMS],
   input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
 
-  input logic                    cfg_push_i  [N_STREAMS],
+  input logic [N_STREAMS-1:0]    cfg_push_i,
   input logic [4*DATA_WIDTH-1:0] cfg_wdata_i [N_STREAMS],
 
   // Bus IF
-  input  logic                  bus_ready_i,
-  output logic                  bus_valid_o,
-  output logic [ADDR_WIDTH-1:0] bus_addr_o,
-  output logic [DATA_WIDTH-1:0] bus_wdata_o
+  input  logic                  bus_ready_i [W_WORKERS],
+  output logic                  bus_valid_o [W_WORKERS],
+  output logic [ADDR_WIDTH-1:0] bus_addr_o  [W_WORKERS],
+  output logic [DATA_WIDTH-1:0] bus_wdata_o [W_WORKERS]
 );
 
   // ############
@@ -77,15 +76,15 @@ module egress_top #(
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
-    .notify_valid_i(notify_valid_i),
-    .notify_start_macro_i(notify_start_macro_i),
+    .notif_valid_i(notif_valid_i),
+    .notif_start_macro_i(notif_start_macro_i),
 
     .cfg_push_i(cfg_push_i),
     .cfg_wdata_i(cfg_wdata_i),
 
     .window_size_i(window_size_i),
 
-    .job_o(u_job_req_if.tx_ready)
+    .job_req_o(u_job_req_if.tx_ready)
   );
 
 
@@ -106,7 +105,7 @@ module egress_top #(
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
-    .job_i(u_job_req_if.rx_ready),
+    .job_req_i(u_job_req_if.rx_ready),
 
     .start_bank_idx_i(start_bank_idx_i),
     .l2_bank_base_i(l2_bank_base_i),
@@ -114,10 +113,11 @@ module egress_top #(
     .bank_header_size_b_i(bank_header_size_b_i),
 
     .worker_done_i(worker_done),
-    .job_o(u_job_assign_if.tx_push),
     .job_wid_o(job_wid),
     .job_addr_o(job_addr),
-    .job_bank_o(job_bank)
+    .job_bank_o(job_bank),
+
+    .job_assign_o(u_job_assign_if.tx_push)
   );
 
 
@@ -130,11 +130,17 @@ module egress_top #(
     worker_sel[job_wid] = 1'b1;
   end
 
+  logic [M_MACROS-1:0] bp_release_all_o [W_WORKERS-1:0];
+
   generate
     for (genvar i = 0; i < W_WORKERS; i++) begin : gen_workers
       address_generator #(
-
-      )(
+        .N_STREAMS(N_STREAMS),
+        .M_MACROS(M_MACROS),
+        .DATA_WIDTH(DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH),
+        .B_BANKS(B_BANKS)
+      ) u_addr_generator (
         .clk_i(clk_i),
         .rst_ni(rst_ni),
 
@@ -142,7 +148,7 @@ module egress_top #(
         .job_assign_i(u_job_assign_if.rx_push),
         .job_addr_i(job_addr),
         .job_bank_i(job_bank),
-        .done_o(worker_done[i]),
+        .job_done_o(worker_done[i]),
 
         .next_pointer_i(next_pointer_i),
 
@@ -154,15 +160,13 @@ module egress_top #(
         .bp_r_rdata_i(bp_r_rdata_o[i]),
         .bp_r_valid_i(bp_r_valid_o[i]),
 
-        .bus_ready_i(bus_ready_i),
-        .bus_valid_o(bus_valid_o),
-        .bus_addr_o(bus_addr_o),
-        .bus_wdata_o(bus_wdata_o)
+        .bus_ready_i(bus_ready_i[i]),
+        .bus_valid_o(bus_valid_o[i]),
+        .bus_addr_o(bus_addr_o[i]),
+        .bus_wdata_o(bus_wdata_o[i])
       );
     end
   endgenerate
-
-  logic [M_MACROS-1:0] bp_release_all_o [W_WORKERS-1:0];
 
   always_comb begin
     bp_release_o = '0;

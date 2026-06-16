@@ -18,11 +18,11 @@ module job_manager #(
   output logic                 dbg_us_job_valid_o,
 
   // Notification IF
-  input logic                       notif_valid_i       [N_STREAMS],
+  input logic [N_STREAMS-1:0]       notif_valid_i,
   input logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_i [N_STREAMS],
 
   // Control IF
-  input logic                    cfg_push_i    [N_STREAMS],
+  input logic [N_STREAMS-1:0]    cfg_push_i,
   input logic [4*DATA_WIDTH-1:0] cfg_wdata_i   [N_STREAMS],
   
   input logic [ADDR_WIDTH-1:0]   window_size_i [N_STREAMS],
@@ -41,14 +41,14 @@ module job_manager #(
   typedef job_req_o.job_pkt_t job_pkt_t;
 
   // Notification FIFOs
-  logic                       notif_empty [N_STREAMS];
-  logic                       notif_pop   [N_STREAMS];
+  logic [N_STREAMS-1:0]       notif_empty;
+  logic [N_STREAMS-1:0]       notif_pop;
   logic [MACRO_PTR_WIDTH-1:0] notif_data  [N_STREAMS];
 
   // Config FIFOs
-  logic cfg_pop   [N_STREAMS];
-  cfg_t cfg_data  [N_STREAMS];
-  logic cfg_empty [N_STREAMS];
+  logic [N_STREAMS-1:0] cfg_pop;
+  cfg_t                 cfg_data [N_STREAMS];
+  logic [N_STREAMS-1:0] cfg_empty;
 
   // Current Config
   cfg_t                 current_cfg_q   [N_STREAMS];

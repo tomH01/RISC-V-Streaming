@@ -30,8 +30,8 @@ module ingress_top #(
   input logic [MACRO_PTR_WIDTH-1:0] cfg_next_pointer_i [M_MACROS],
 
   // Egress IF
-  output logic [N_STREAMS-1:0]       notify_valid_o,
-  output logic [MACRO_PTR_WIDTH-1:0] notify_start_macro_o [N_STREAMS]
+  output logic [N_STREAMS-1:0]       notif_valid_o,
+  output logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_o [N_STREAMS]
 );
 
   // ############
@@ -94,8 +94,8 @@ module ingress_top #(
 
     .done_o(bp_done_o),  
 
-    .window_valid_o(notify_valid_o),
-    .window_start_o(notify_start_macro_o)
+    .window_valid_o(notif_valid_o),
+    .window_start_o(notif_start_macro_o)
   );
   
 

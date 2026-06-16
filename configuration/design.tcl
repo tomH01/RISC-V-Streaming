@@ -57,8 +57,8 @@ $rr_arbiter addPythonSimFiles [concat $global_sim_files [list \
 set buffer_pool [EDA::Design::createComponent buffer_pool]
 
 $buffer_pool addHDLSourceFiles [list \
-  "src/hdl/dma/buffer_pool.sv" \
   "src/hdl/memory/buffer_sram_macro.sv" \
+  "src/hdl/dma/buffer_pool.sv" \
 ]
 
 $buffer_pool addPythonSimFiles [concat $global_sim_files [list \
@@ -87,10 +87,10 @@ $alloc_manager addHDLSourceFiles [list \
 set ingress_top [EDA::Design::createComponent ingress_top]
 
 $ingress_top addHDLSourceFiles [list \
-  "src/hdl/dma/ingress/ingress_top.sv" \
   "src/hdl/common/flow_control/skid_buffer.sv" \
   "src/hdl/dma/ingress/ingress_crossbar.sv" \
   "src/hdl/dma/ingress/alloc_manager.sv" \
+  "src/hdl/dma/ingress/ingress_top.sv" \
 ]
 
 $ingress_top addPythonSimFiles [concat $global_sim_files [list \
@@ -164,10 +164,29 @@ $address_generator_wrapper addHDLSourceFiles [list \
   "src/hdl/dma/egress/address_generator.sv" \
   "src/test/dma/egress/address_generator_wrapper.sv" \
 ]
+
 $address_generator_wrapper addPythonSimFiles [concat $global_sim_files [list \
   "src/test/tools/addr_generator_models.py" \
   "src/test/tools/config_randomizer.py" \
   "src/test/dma/egress/test_address_generator.py" \
+]]
+
+
+set egress_top [EDA::Design::createComponent egress_top]
+
+$egress_top addHDLSourceFiles [list \
+  "src/hdl/common/flow_control/skid_buffer.sv" \
+  "src/hdl/common/mem/fwft_fifo.sv" \
+  "src/hdl/common/arb/rr_arbiter.sv" \
+  "src/hdl/dma/egress/job_if.sv" \
+  "src/hdl/dma/egress/strided_addr_gen.sv" \
+  "src/hdl/dma/egress/address_generator.sv" \
+  "src/hdl/dma/egress/l2_allocator.sv" \
+  "src/hdl/dma/egress/job_manager.sv" \
+  "src/hdl/dma/egress/egress_top.sv" \
+]
+
+$egress_top addPythonSimFiles [concat $global_sim_files [list \
 ]]
 
 
@@ -184,6 +203,32 @@ $control addHDLSourceFiles [list \
 
 $control addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/test_control.py" \
+]]
+
+
+set dma_top [EDA::Design::createComponent dma_top]
+
+$dma_top addHDLSourceFiles [list \
+  "src/hdl/common/flow_control/skid_buffer.sv" \
+  "src/hdl/common/mem/fwft_fifo.sv" \
+  "src/hdl/common/arb/rr_arbiter.sv" \
+  "src/hdl/memory/buffer_sram_macro.sv" \
+  "src/hdl/dma/ingress/ingress_crossbar.sv" \
+  "src/hdl/dma/ingress/alloc_manager.sv" \
+  "src/hdl/dma/ingress/ingress_top.sv" \
+  "src/hdl/dma/egress/job_if.sv" \
+  "src/hdl/dma/egress/job_manager.sv" \
+  "src/hdl/dma/egress/l2_allocator.sv" \
+  "src/hdl/dma/egress/strided_addr_gen.sv" \
+  "src/hdl/dma/egress/address_generator.sv" \
+  "src/hdl/dma/egress/egress_top.sv" \
+  "src/hdl/dma/buffer_pool.sv" \
+  "src/hdl/dma/control.sv" \
+  "src/hdl/dma/dma_top.sv" \
+]
+
+$dma_top addPythonSimFiles [concat $global_sim_files [list \
+  "src/test/dma/test_dma_top.py" \
 ]]
 
 

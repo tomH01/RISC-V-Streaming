@@ -4,13 +4,15 @@ module dma_top #(
   parameter int DATA_WIDTH  = 32,
   parameter int ADDR_WIDTH  = 32,
   parameter int W_WORKERS   = 1,
+  parameter int B_BANKS     = 2,
   parameter int MACRO_DEPTH = 256,
 
-  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS),
+  localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
+  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS)
 )(
   input logic clk_i,
-  input logic rst_ni
+  input logic rst_ni,
 
   // Stream IF
   input logic [DATA_WIDTH-1:0] stream_data_i  [N_STREAMS],
@@ -19,20 +21,20 @@ module dma_top #(
 
 
   // APB Target IF
-  input logic                       penable_i,
-  input logic                       pwrite_i,
-  input logic [APB_ADDR_WIDTH-1:0]  paddr_i,
-  input logic                       psel_i,
-  input logic [APB_DATA_WIDTH-1:0]  pwdata_i,
-  output logic [APB_DATA_WIDTH-1:0] prdata_o,
-  output logic                      pready_o,
-  output logic                      pslverr_o
+  input logic                   penable_i,
+  input logic                   pwrite_i,
+  input logic  [ADDR_WIDTH-1:0] paddr_i,
+  input logic                   psel_i,
+  input logic  [DATA_WIDTH-1:0] pwdata_i,
+  output logic [DATA_WIDTH-1:0] prdata_o,
+  output logic                  pready_o,
+  output logic                  pslverr_o,
 
   // TCDM Bus IF
-  input  logic                  bus_ready_i,
-  output logic                  bus_valid_o, 
-  output logic [ADDR_WIDTH-1:0] bus_addr_o,
-  output logic [DATA_WIDTH-1:0] bus_wdata_o
+  input  logic                  bus_ready_i [W_WORKERS],
+  output logic                  bus_valid_o [W_WORKERS],
+  output logic [ADDR_WIDTH-1:0] bus_addr_o  [W_WORKERS],
+  output logic [DATA_WIDTH-1:0] bus_wdata_o [W_WORKERS]
 );
 
   // #######
@@ -53,9 +55,10 @@ module dma_top #(
   control #(
     .N_STREAMS(N_STREAMS),
     .M_MACROS(M_MACROS),
-    .NB_READ_PORTS(NB_READ_PORTS),
     .DATA_WIDTH(DATA_WIDTH),
-    .ADDR_WIDTH(ADDR_WIDTH)
+    .ADDR_WIDTH(ADDR_WIDTH),
+    .MACRO_DEPTH(MACRO_DEPTH),
+    .B_BANKS(B_BANKS)
   ) u_control (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
@@ -70,10 +73,10 @@ module dma_top #(
     .pslverr_o(pslverr_o),
 
     .dma_enable_o(cfg_dma_enable),
-    .start_bank_idx_o(cfg_start_bank_idx_o),
-    .l2_bank_base_o(cfg_l2_bank_base_o),
-    .bank_limit_b_o(cfg_bank_limit_b_o),
-    .bank_header_size_b_o(cfg_bank_header_size_b_o),
+    .start_bank_idx_o(cfg_start_bank_idx),
+    .l2_bank_base_o(cfg_l2_bank_base),
+    .bank_limit_b_o(cfg_bank_limit_b),
+    .bank_header_size_b_o(cfg_bank_header_size_b),
 
     .stream_en_o(cfg_stream_en),
     .window_size_o(cfg_window_size),
@@ -89,15 +92,15 @@ module dma_top #(
   // ###########
   // Ingress
 
-  logic [M_MACROS-1:0]   ingress_gnt;
-  logic [M_MACROS-1:0]   ingress_done;
-  logic [M_MACROS-1:0]   ingress_req;
-  logic [ADDR_WIDTH-1:0] ingress_addr  [M_MACROS];
-  logic [DATA_WIDTH-1:0] ingress_wdata [M_MACROS];
-  logic [3:0]            ingress_be    [M_MACROS];
+  logic [M_MACROS-1:0]   ingr_gnt;
+  logic [M_MACROS-1:0]   ingr_done;
+  logic [M_MACROS-1:0]   ingr_req;
+  logic [ADDR_WIDTH-1:0] ingr_addr  [M_MACROS];
+  logic [DATA_WIDTH-1:0] ingr_wdata [M_MACROS];
+  logic [3:0]            ingr_be    [M_MACROS];
 
-  logic [N_STREAMS-1:0]        notify_valid;
-  logic [MACRO_PTR_WIDTH-1:0]  notify_start_macro [N_STREAMS];
+  logic [N_STREAMS-1:0]        notif_valid;
+  logic [MACRO_PTR_WIDTH-1:0]  notif_start_macro [N_STREAMS];
 
   ingress_top #(
     .N_STREAMS(N_STREAMS),
@@ -113,55 +116,55 @@ module dma_top #(
     .stream_valid_i(stream_valid_i),
     .stream_ready_o(stream_ready_o),
 
-    .bp_gnt_i(ingress_gnt),
-    .bp_done_o(ingress_done),
-    .bp_req_o(ingress_req),
-    .bp_addr_o(ingress_addr),
-    .bp_wdata_o(ingress_wdata),
-    .bp_be_o(ingress_be),
+    .bp_gnt_i(ingr_gnt),
+    .bp_done_o(ingr_done),
+    .bp_req_o(ingr_req),
+    .bp_addr_o(ingr_addr),
+    .bp_wdata_o(ingr_wdata),
+    .bp_be_o(ingr_be),
 
     .cfg_stream_en_i(cfg_stream_en),
     .cfg_window_size_i(cfg_window_size),
     .cfg_start_macro_i(cfg_start_macro),
     .cfg_next_pointer_i(cfg_next_pointer),
 
-    .notify_valid_o(notify_valid),
-    .notify_start_macro_o(notify_start_macro)
+    .notif_valid_o(notif_valid),
+    .notif_start_macro_o(notif_start_macro)
   );
 
 
   // ##########
   // Egress
 
-  logic [NB_READ_PORTS-1:0]    egress_gnt;
-  logic [DATA_WIDTH-1:0]       egress_r_rdata      [NB_READ_PORTS];
-  logic [NB_READ_PORTS-1:0]    egress_r_valid;
-  logic [M_MACROS-1:0]         egress_release;
-  logic [NB_READ_PORTS-1:0]    egress_req;
-  logic [ADDR_WIDTH-1:0]       egress_addr         [NB_READ_PORTS];
-  logic [MACRO_PTR_WIDTH-1:0]  egress_macro_select [NB_READ_PORTS];
+  logic [W_WORKERS-1:0]       egr_gnt;
+  logic [DATA_WIDTH-1:0]      egr_r_rdata      [W_WORKERS];
+  logic [W_WORKERS-1:0]       egr_r_valid;
+  logic [M_MACROS-1:0]        egr_release;
+  logic [W_WORKERS-1:0]       egr_req;
+  logic [ADDR_WIDTH-1:0]      egr_addr         [W_WORKERS];
+  logic [MACRO_PTR_WIDTH-1:0] egr_macro_select [W_WORKERS];
 
   egress_top #(
     .N_STREAMS(N_STREAMS),
     .M_MACROS(M_MACROS),
-    .NB_READ_PORTS(NB_READ_PORTS),
     .DATA_WIDTH(DATA_WIDTH),
-    .ADDR_WIDTH(ADDR_WIDTH)
+    .ADDR_WIDTH(ADDR_WIDTH),
+    .W_WORKERS(W_WORKERS),
+    .B_BANKS(B_BANKS)
   ) u_egress_top (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
-    .notify_valid_i(notify_valid),
-    .notify_start_macro_i(notify_start_macro),
+    .notif_valid_i(notif_valid),
+    .notif_start_macro_i(notif_start_macro),
 
-    .bp_gnt_i(egress_gnt),
-    .bp_r_rdata_o(egress_r_rdata),
-    .bp_r_valid_o(egress_r_valid),
-    .bp_release_o(egress_release),
-    .bp_req_o(egress_req),
-    .bp_addr_o(egress_addr),
-    .bp_macro_sel_o(egress_macro_select),
-    .switch_state_o(),
+    .bp_gnt_i(egr_gnt),
+    .bp_r_rdata_o(egr_r_rdata),
+    .bp_r_valid_o(egr_r_valid),
+    .bp_release_o(egr_release),
+    .bp_req_o(egr_req),
+    .bp_addr_o(egr_addr),
+    .bp_macro_sel_o(egr_macro_select),
 
     .start_bank_idx_i(cfg_start_bank_idx),
     .l2_bank_base_i(cfg_l2_bank_base),
@@ -187,7 +190,7 @@ module dma_top #(
   // Buffer Pool
   buffer_pool #(
     .M_MACROS(M_MACROS),
-    .NB_READ_PORTS(NB_READ_PORTS),
+    .NUM_READ_PORTS(W_WORKERS),
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
     .MACRO_DEPTH(MACRO_DEPTH)
@@ -195,19 +198,19 @@ module dma_top #(
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
-    .ingress_done_i(ingress_done),
-    .ingress_req_i(ingress_req),
-    .ingress_addr_i(ingress_addr),
-    .ingress_wdata_i(ingress_wdata),
-    .ingress_be_i(ingress_be),
-    .ingress_gnt_o(ingress_gnt),
+    .ingr_done_i(ingr_done),
+    .ingr_req_i(ingr_req),
+    .ingr_addr_i(ingr_addr),
+    .ingr_wdata_i(ingr_wdata),
+    .ingr_be_i(ingr_be),
+    .ingr_gnt_o(ingr_gnt),
 
-    .egress_release_i(egress_release),
-    .egress_req_i(egress_req),
-    .egress_addr_i(egress_addr),
-    .egress_macro_select_i(egress_macro_select),
-    .egress_gnt_o(egress_gnt),
-    .egress_r_rdata_o(egress_r_rdata),
-    .egress_r_valid_o(egress_r_valid)
+    .egr_release_i(egr_release),
+    .egr_req_i(egr_req),
+    .egr_addr_i(egr_addr),
+    .egr_macro_select_i(egr_macro_select),
+    .egr_gnt_o(egr_gnt),
+    .egr_r_rdata_o(egr_r_rdata),
+    .egr_r_valid_o(egr_r_valid)
   );
 endmodule

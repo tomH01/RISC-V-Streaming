@@ -35,7 +35,7 @@ module control #(
   output logic [MACRO_PTR_WIDTH-1:0] start_macro_o  [N_STREAMS],
 
   // Egress IF
-  output logic                    cfg_push_o  [N_STREAMS],
+  output logic [N_STREAMS-1:0]    cfg_push_o,
   output logic [4*DATA_WIDTH-1:0] cfg_wdata_o [N_STREAMS],
 
   // Topology IF
@@ -58,7 +58,7 @@ module control #(
   logic [DATA_WIDTH-1:0]      egress_shadow_0_q [N_STREAMS];
   logic [DATA_WIDTH-1:0]      egress_shadow_1_q [N_STREAMS];
   logic [DATA_WIDTH-1:0]      egress_shadow_2_q [N_STREAMS];
-  logic                       cfg_push_q        [N_STREAMS];
+  logic [N_STREAMS-1:0]       cfg_push_q;
   logic [4*DATA_WIDTH-1:0]    cfg_wdata_q       [N_STREAMS];
 
   logic [MACRO_PTR_WIDTH-1:0] next_pointer_q    [M_MACROS];
