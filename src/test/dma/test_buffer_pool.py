@@ -5,7 +5,9 @@ from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly
 from cocotb_coverage.coverage import CoverPoint, CoverCross, coverage_db
 
-from get_param import get_param
+from utils.python.cocotb import get_design_parameters
+
+params = get_design_parameters()
 
 @CoverPoint(
     "buffer_pool.egress.macro_select",
@@ -117,8 +119,8 @@ class BufferPoolDriver:
 async def test_rw_coverage(dut):
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
 
-    m_macros = get_param(dut, "M_MACROS")
-    num_read_ports = get_param(dut, "NUM_READ_PORTS")
+    m_macros = int(params["M_MACROS"])
+    num_read_ports = int(params["NUM_READ_PORTS"])
 
     driver = BufferPoolDriver(dut, m_macros, num_read_ports)
     await driver.reset()

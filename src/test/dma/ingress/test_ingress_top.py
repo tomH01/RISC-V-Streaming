@@ -8,7 +8,9 @@ from cocotb.queue import Queue
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly
 
-from get_param import get_param
+from utils.python.cocotb import get_design_parameters
+
+params = get_design_parameters()
 
 
 class IngressTopDriver:
@@ -311,10 +313,10 @@ async def test_ingress_top_crv(dut):
     
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
-    n_streams = get_param(dut, "N_STREAMS")
-    m_macros = get_param(dut, "M_MACROS")
-    macro_depth = get_param(dut, "MACRO_DEPTH")
-    
+    n_streams = int(params["N_STREAMS"])
+    m_macros = int(params["M_MACROS"])
+    macro_depth = int(params["MACRO_DEPTH"])
+
     driver = IngressTopDriver(dut, n_streams=n_streams, m_macros=m_macros)
     
     golden_model = GoldenModel(n_streams=n_streams, m_macros=m_macros, macro_depth=macro_depth)

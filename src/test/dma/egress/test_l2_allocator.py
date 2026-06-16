@@ -304,8 +304,8 @@ async def test_l2_allocator_crv(dut):
     rnd.seed(42)
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start()) 
     
-    b_banks = int(params.get("B_BANKS"))
-    w_workers = int(params.get("W_WORKERS"))
+    b_banks = int(params["B_BANKS"])
+    w_workers = int(params["W_WORKERS"])
     
     driver = L2AllocatorDriver(dut, b_banks, w_workers)
     score_board = Scoreboard(dut)

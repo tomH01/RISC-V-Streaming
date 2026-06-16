@@ -26,7 +26,7 @@ module address_generator_wrapper #(
 
   input logic [ADDR_WIDTH-1:0]     job_addr_i,
   input logic [BANK_PTR_WIDTH-1:0] job_bank_i,
-  output logic                     done_o,
+  output logic                     job_done_o,
 
   // Control IF
   input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
@@ -35,7 +35,7 @@ module address_generator_wrapper #(
   output logic [M_MACROS-1:0]        bp_release_o,
   output logic                       bp_req_o,
   output logic [ADDR_WIDTH-1:0]      bp_addr_o,
-  output logic [MACRO_PTR_WIDTH-1:0] bp_macro_select_o,
+  output logic [MACRO_PTR_WIDTH-1:0] bp_macro_sel_o,
   input  logic                       bp_gnt_i,
   input  logic [DATA_WIDTH-1:0]      bp_r_rdata_i,
   input  logic                       bp_r_valid_i,
@@ -76,14 +76,14 @@ module address_generator_wrapper #(
     .job_assign_i(u_job_assign_if.rx_push),
     .job_addr_i(job_addr_i),
     .job_bank_i(job_bank_i),
-    .done_o(done_o),
+    .job_done_o(job_done_o),
 
     .next_pointer_i(next_pointer_i),
 
     .bp_release_o(bp_release_o),
     .bp_req_o(bp_req_o),
     .bp_addr_o(bp_addr_o),
-    .bp_macro_select_o(bp_macro_select_o),
+    .bp_macro_sel_o(bp_macro_sel_o),
     .bp_gnt_i(bp_gnt_i),
     .bp_r_rdata_i(bp_r_rdata_i),
     .bp_r_valid_i(bp_r_valid_i),

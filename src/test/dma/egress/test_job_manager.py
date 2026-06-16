@@ -9,7 +9,10 @@ from cocotb.queue import Queue
 from cocotb.triggers import ClockCycles, RisingEdge, ReadOnly
 from cocotb.clock import Clock
 
-from get_param import get_param
+from utils.python.cocotb import get_design_parameters
+
+params = get_design_parameters()
+
 
 class JobManagerDriver:
     def __init__(self, dut, n_streams):
@@ -207,9 +210,9 @@ async def test_job_manager_crv(dut):
     rnd.seed(42)
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
-    n_streams = get_param(dut, "N_STREAMS")
-    fifo_depth = get_param(dut, "FIFO_DEPTH")
-    m_macros = get_param(dut, "M_MACROS")
+    n_streams = int(params["N_STREAMS"])
+    fifo_depth = int(params["FIFO_DEPTH"])
+    m_macros = int(params["M_MACROS"])
 
     score_board = Scoreboard()
     golden_model = GoldenModel(dut, score_board, n_streams, fifo_depth)

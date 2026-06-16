@@ -23,7 +23,7 @@ module address_generator #(
   job_if.rx_push                   job_assign_i,
   input logic [ADDR_WIDTH-1:0]     job_addr_i,
   input logic [BANK_PTR_WIDTH-1:0] job_bank_i,
-  output logic                     done_o,
+  output logic                     job_done_o,
 
   // Control IF
   input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
@@ -69,7 +69,6 @@ module address_generator #(
 
   logic [ADDR_WIDTH-1:0]      req_cnt_q,      req_cnt_d;
   logic [ADDR_WIDTH-1:0]      bus_cnt_q,      bus_cnt_d;
-  logic [3:0]                 inflight_cnt_q, inflight_cnt_d;
 
   logic [MACRO_CNT_WIDTH-1:0] num_macros_needed_q, num_macros_needed_d;
   logic [MACRO_PTR_WIDTH-1:0] macro_table_q [M_MACROS/2]; 
@@ -81,8 +80,13 @@ module address_generator #(
   logic                  job_start; 
   logic                  can_issue_req;
   logic                  skid_ready;
+  logic                  pipeline_full;
 
-  assign can_issue_req     = (state_q == RUN) && skid_ready && (req_cnt_q < window_size_q);
+  assign pipeline_full     = ((req_cnt_q - bus_cnt_q) >= 2);
+  assign can_issue_req     = (state_q == RUN) && 
+                             skid_ready &&
+                             !pipeline_full &&
+                             (req_cnt_q < window_size_q);
 
   assign bp_addr_o         = current_addr[OFFSET_WIDTH-1:0] << WIDTH_SHIFT;
   assign bp_macro_sel_o    = macro_table_q[current_addr >> OFFSET_WIDTH];
@@ -109,8 +113,8 @@ module address_generator #(
     base_addr_d      = base_addr_q;
     bank_idx_d       = bank_idx_q;
 
-    job_start = 1'b0;
-    done_o    = 1'b0;
+    job_start  = 1'b0;
+    job_done_o = 1'b0;
 
     case (state_q)
       IDLE: begin
@@ -160,18 +164,17 @@ module address_generator #(
 
         // Bus transaction
         if (bus_valid_o && bus_ready_i) begin
+          bus_cnt_d = bus_cnt_q + 1;
           if (bus_cnt_q == window_size_q - 1) begin
             state_d = FINISH;
-          end else begin
-            bus_cnt_d = bus_cnt_q + 1;
           end
         end
       end
 
       FINISH: begin
-        if (inflight_cnt_q == 0) begin
+        if (req_cnt_q == bus_cnt_q) begin
           macro_mask_d = '0; 
-          done_o       = 1'b1;
+          job_done_o   = 1'b1;
           state_d      = IDLE;
         end 
       end
@@ -197,7 +200,7 @@ module address_generator #(
     .rst_ni(rst_ni),
     .job_start_i(job_start),
     .req_i(req_all[MODE_STRIDED]),
-    .base_addr_i('0'),
+    .base_addr_i('0),
     .payload_i(payload_q),
     .addr_o(addr_all[MODE_STRIDED])
   );  
@@ -207,16 +210,6 @@ module address_generator #(
       MODE_LINEAR:  current_addr = addr_all[MODE_LINEAR];
       MODE_STRIDED: current_addr = addr_all[MODE_STRIDED];
       default:      current_addr = addr_all[MODE_LINEAR];
-    endcase
-  end
-
-  always_comb begin
-    inflight_cnt_d = inflight_cnt_q;
-
-    case ({bp_req_o && bp_gnt_i, bp_r_valid_i})
-      2'b10: inflight_cnt_d = inflight_cnt_q + 1'b1;
-      2'b01: inflight_cnt_d = inflight_cnt_q - 1'b1;
-      default: ; // No change
     endcase
   end
 
@@ -254,7 +247,6 @@ module address_generator #(
       prep_cnt_q          <= '0;
       macro_mask_q        <= '0;
 
-      inflight_cnt_q <= '0;
     end else begin
       state_q <= state_d;
 
@@ -273,8 +265,6 @@ module address_generator #(
       macro_table_q       <= macro_table_d;
       prep_cnt_q          <= prep_cnt_d;
       macro_mask_q        <= macro_mask_d;
-
-      inflight_cnt_q <= inflight_cnt_d;
     end
   end
 

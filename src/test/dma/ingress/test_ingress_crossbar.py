@@ -3,17 +3,19 @@ import random as rnd
 
 from cocotb.triggers import Timer
 
-from get_param import get_param
+from utils.python.cocotb import get_design_parameters
+
+params = get_design_parameters()
 
 
 @cocotb.test()
 async def test_crossbar_routing(dut):
     rnd.seed(42)
     
-    N_STREAMS = get_param(dut, "N_STREAMS")
-    M_MACROS = get_param(dut, "M_MACROS")
-    DATA_WIDTH = get_param(dut, "DATA_WIDTH")
-    ADDR_WIDTH = get_param(dut, "ADDR_WIDTH")
+    N_STREAMS = int(params["N_STREAMS"])
+    M_MACROS = int(params["M_MACROS"])
+    DATA_WIDTH = int(params["DATA_WIDTH"])
+    ADDR_WIDTH = int(params["ADDR_WIDTH"])
 
     NUM_TESTS = 1000
 

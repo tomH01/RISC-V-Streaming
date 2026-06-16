@@ -7,7 +7,7 @@
 
 set syn_config my
 
-set module "job_manager_wrapper"
+set module "address_generator_wrapper"
 
 # Get Technology
 set technology [EDA::Technology::getTechnology 22fdsoi_plus]
@@ -42,7 +42,8 @@ set allowed_params [list \
   M_MACROS \
   DATA_WIDTH \
   ADDR_WIDTH \
-  FIFO_DEPTH \
+  B_BANKS \
+  MACRO_DEPTH \
 ]
 source [file normalize [file join $bottle_dir "configuration" "params.tcl"]]
 dict for {param value} $::params {

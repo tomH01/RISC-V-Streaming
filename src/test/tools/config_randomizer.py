@@ -16,7 +16,7 @@ class ConfigRandomizer:
         available_macros = list(range(self.m_macros))
         rnd.shuffle(available_macros)    
         
-        nb_active_streams = rnd.randint(1, self.n_streams)
+        nb_active_streams = self.n_streams
             
         active_stream_ids = rnd.sample(range(self.n_streams), nb_active_streams)
         window_sizes, macros_per_window_list = self._generate_window_sizes(nb_active_streams)

@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import random as rnd
 
 from enum import IntEnum
@@ -5,22 +6,39 @@ from enum import IntEnum
 class Mode(IntEnum):
     LINEAR = 0
     STRIDED = 1
+    
+
+class BaseGeneratorModel(ABC):
+    @abstractmethod
+    def initialize(self, config_payload, base_addr=0):
+        pass
+    
+    @abstractmethod
+    def step(self) -> int:
+        pass
+    
+    @abstractmethod
+    def generate_payload(self, window_size) -> int:
+        pass
 
 
-class LinearGeneratorModel:
+class LinearGeneratorModel(BaseGeneratorModel):
     def __init__(self):
         self.current_addr = 0
         
     def initialize(self, config_payload=None, base_addr=0):
         self.current_addr = base_addr
         
-    def step(self):
+    def step(self) -> int:
         out_addr = self.current_addr
         self.current_addr += 1
         return out_addr
+    
+    def generate_payload(self, window_size) -> int:
+        return 0
         
 
-class StridedGeneratorModel:
+class StridedGeneratorModel(BaseGeneratorModel):
     def __init__(self, count_width, stride_width, num_axes):        
         self.count_width = count_width
         self.stride_width = stride_width
@@ -41,7 +59,7 @@ class StridedGeneratorModel:
         self.counts = counts
         self.counters = [0 for _ in range(self.num_axes)]
     
-    def step(self):
+    def step(self) -> int:
         out_addr = self.current_addr
         
         for i in range(self.num_axes):
@@ -89,7 +107,7 @@ class StridedGeneratorModel:
         
         return strides, counts
     
-    def generate_payload(self, window_size):
+    def generate_payload(self, window_size) -> int:
         if window_size <= 0:
             raise ValueError("Window size must be greater than 0.")
         

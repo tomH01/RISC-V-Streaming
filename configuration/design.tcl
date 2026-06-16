@@ -12,7 +12,7 @@
 # ------
 
 set global_sim_files [list \
-  "src/test/tools/get_param.py" \
+
 ]
 
 
@@ -158,6 +158,8 @@ $strided_addr_gen addPythonSimFiles [concat $global_sim_files [list \
 
 set address_generator_wrapper [EDA::Design::createComponent address_generator_wrapper]
 $address_generator_wrapper addHDLSourceFiles [list \
+  "src/hdl/dma/egress/job_if.sv" \
+  "src/hdl/common/flow_control/skid_buffer.sv" \
   "src/hdl/dma/egress/strided_addr_gen.sv" \
   "src/hdl/dma/egress/address_generator.sv" \
   "src/test/dma/egress/address_generator_wrapper.sv" \

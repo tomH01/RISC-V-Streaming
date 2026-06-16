@@ -4,8 +4,11 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly
 
-from get_param import get_param
 from addr_generator_models import StridedGeneratorModel
+
+from utils.python.cocotb import get_design_parameters
+
+params = get_design_parameters()
 
 
 class StridedAddrGenDriver:
@@ -43,9 +46,9 @@ async def test_strided_addr_gen(dut):
     rnd.seed(42)
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
-    count_width = get_param(dut, "COUNT_WIDTH")
-    stride_width = get_param(dut, "STRIDE_WIDTH")
-    num_axes = get_param(dut, "NUM_AXES")
+    count_width = int(params["COUNT_WIDTH"])
+    stride_width = int(params["STRIDE_WIDTH"])
+    num_axes = int(params["NUM_AXES"])
     
     driver = StridedAddrGenDriver(dut, count_width, stride_width, num_axes)
     await driver.reset()

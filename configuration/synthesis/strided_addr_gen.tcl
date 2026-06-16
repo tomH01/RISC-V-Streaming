@@ -46,7 +46,7 @@ set allowed_params [list \
 source [file normalize [file join $bottle_dir "configuration" "params.tcl"]]
 dict for {param value} $::params {
     if {$param in $allowed_params} {
-        $syn_config addParameter $param [string cat $value]
+        $syn_config addDesignParameter $param [string cat $value]
     } else {
         puts "\[TEDA-INFO\] Skipping parameter $param (not used in $module)"
     }

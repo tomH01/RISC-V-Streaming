@@ -6,7 +6,9 @@ import random as rnd
 from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge
 from cocotb.clock import Clock
 
-from get_param import get_param
+from utils.python.cocotb import get_design_parameters
+
+params = get_design_parameters()
 
 
 class ControlDriver:
@@ -142,9 +144,9 @@ class ConfigRandomizer:
 async def test_ingress_control(dut):
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
-    n_streams = get_param(dut, "N_STREAMS")
-    m_macros = get_param(dut, "M_MACROS")
-    macro_depth = get_param(dut, "MACRO_DEPTH")
+    n_streams = int(params["N_STREAMS"])
+    m_macros = int(params["M_MACROS"])
+    macro_depth = int(params["MACRO_DEPTH"])
     
     driver = ControlDriver(dut, n_streams, m_macros)
     
@@ -202,9 +204,9 @@ async def test_ingress_control(dut):
 async def test_egress_control(dut):
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
     
-    n_streams = get_param(dut, "N_STREAMS")
-    m_macros = get_param(dut, "M_MACROS")
-    
+    n_streams = int(params["N_STREAMS"])
+    m_macros = int(params["M_MACROS"])
+
     driver = ControlDriver(dut, n_streams, m_macros)
     
     await driver.reset()

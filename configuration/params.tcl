@@ -1,5 +1,5 @@
 dict set ::params N_STREAMS 4
-dict set ::params M_MACROS 8
+dict set ::params M_MACROS 32
 dict set ::params DATA_WIDTH 32
 dict set ::params ADDR_WIDTH 32
 dict set ::params MACRO_DEPTH 256
