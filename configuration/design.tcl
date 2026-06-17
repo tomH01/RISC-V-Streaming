@@ -54,18 +54,6 @@ $rr_arbiter addPythonSimFiles [concat $global_sim_files [list \
 # Ingress
 # -------
 
-set buffer_pool [EDA::Design::createComponent buffer_pool]
-
-$buffer_pool addHDLSourceFiles [list \
-  "src/hdl/memory/buffer_sram_macro.sv" \
-  "src/hdl/dma/buffer_pool.sv" \
-]
-
-$buffer_pool addPythonSimFiles [concat $global_sim_files [list \
-  "src/test/dma/test_buffer_pool.py" \
-]]
-
-
 set ingress_crossbar [EDA::Design::createComponent ingress_crossbar]
 
 $ingress_crossbar addHDLSourceFiles [list \
@@ -229,6 +217,29 @@ $dma_top addHDLSourceFiles [list \
 
 $dma_top addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/test_dma_top.py" \
+]]
+
+
+set buffer_pool [EDA::Design::createComponent buffer_pool]
+
+$buffer_pool addHDLSourceFiles [list \
+  "src/hdl/memory/buffer_sram_macro.sv" \
+  "src/hdl/dma/buffer_pool.sv" \
+]
+
+$buffer_pool addPythonSimFiles [concat $global_sim_files [list \
+  "src/test/dma/test_buffer_pool.py" \
+]]
+
+
+set stream_generator [EDA::Design::createComponent stream_generator]
+
+$stream_generator addHDLSourceFiles [list \
+  "src/hdl/dma/stream_generator.sv" \
+]
+
+$stream_generator addPythonSimFiles [concat $global_sim_files [list \
+  "src/test/dma/test_stream_generator.py" \
 ]]
 
 
