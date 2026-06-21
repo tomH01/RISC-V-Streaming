@@ -14,12 +14,6 @@ module dma_top #(
   input logic clk_i,
   input logic rst_ni,
 
-  // Stream IF
-  input logic [DATA_WIDTH-1:0] stream_data_i  [N_STREAMS],
-  input logic                  stream_valid_i [N_STREAMS],
-  output logic                 stream_ready_o [N_STREAMS],
-
-
   // APB Target IF
   input logic                   penable_i,
   input logic                   pwrite_i,
@@ -46,11 +40,12 @@ module dma_top #(
   logic [DATA_WIDTH-1:0]      cfg_bank_limit_b;
   logic [DATA_WIDTH-1:0]      cfg_bank_header_size_b;
   logic [N_STREAMS-1:0]       cfg_stream_en;
-  logic [ADDR_WIDTH-1:0]      cfg_window_size  [N_STREAMS];
-  logic [MACRO_PTR_WIDTH-1:0] cfg_start_macro  [N_STREAMS];
-  logic [N_STREAMS-1:0]       cfg_push;
-  logic [4*DATA_WIDTH-1:0]    cfg_wdata        [N_STREAMS];
-  logic [MACRO_PTR_WIDTH-1:0] cfg_next_pointer [M_MACROS];
+  logic [DATA_WIDTH-1:0]      cfg_stream_interval [N_STREAMS];
+  logic [ADDR_WIDTH-1:0]      cfg_window_size     [N_STREAMS];
+  logic [MACRO_PTR_WIDTH-1:0] cfg_start_macro     [N_STREAMS];
+  logic [N_STREAMS-1:0]       cfg_push;   
+  logic [4*DATA_WIDTH-1:0]    cfg_wdata           [N_STREAMS];
+  logic [MACRO_PTR_WIDTH-1:0] cfg_next_pointer    [M_MACROS];
 
   control #(
     .N_STREAMS(N_STREAMS),
@@ -79,6 +74,7 @@ module dma_top #(
     .bank_header_size_b_o(cfg_bank_header_size_b),
 
     .stream_en_o(cfg_stream_en),
+    .stream_interval_o(cfg_stream_interval),
     .window_size_o(cfg_window_size),
     .start_macro_o(cfg_start_macro),
 
@@ -86,6 +82,33 @@ module dma_top #(
     .cfg_wdata_o(cfg_wdata),
 
     .next_pointer_o(cfg_next_pointer)
+  );
+
+
+  // ################
+  // Stream Generator
+
+  logic [DATA_WIDTH-1:0] stream_data [N_STREAMS];
+  logic [N_STREAMS-1:0]  stream_valid;
+  logic [N_STREAMS-1:0]  stream_ready;
+
+  stream_generator #(
+    .N_STREAMS(N_STREAMS),
+    .DATA_WIDTH(DATA_WIDTH),
+    .ADDR_WIDTH(ADDR_WIDTH),
+    .STREAM_OFFSET_WIDTH(20)
+  ) u_stream_generator (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+
+    .stream_data_o(stream_data),
+    .stream_valid_o(stream_valid),
+    .stream_ready_i(stream_ready),
+
+    .stream_en_i(cfg_stream_en),
+    .stream_interval_i(cfg_stream_interval),
+
+    .stream_drop_cnt_o()
   );
 
 
@@ -112,9 +135,9 @@ module dma_top #(
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
-    .stream_data_i(stream_data_i),
-    .stream_valid_i(stream_valid_i),
-    .stream_ready_o(stream_ready_o),
+    .stream_data_i(stream_data),
+    .stream_valid_i(stream_valid),
+    .stream_ready_o(stream_ready),
 
     .bp_gnt_i(ingr_gnt),
     .bp_done_o(ingr_done),

@@ -9,8 +9,8 @@ module stream_generator #(
 
   // Stream IF
   output logic [DATA_WIDTH-1:0] stream_data_o  [N_STREAMS],
-  output logic                  stream_valid_o [N_STREAMS],
-  input logic                   stream_ready_i [N_STREAMS],
+  output logic [N_STREAMS-1:0]  stream_valid_o,
+  input logic  [N_STREAMS-1:0]  stream_ready_i,
 
   // Control IF
   input logic [N_STREAMS-1:0]  stream_en_i,

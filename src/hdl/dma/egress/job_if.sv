@@ -12,7 +12,7 @@ interface job_if #(
     logic [MACRO_PTR_WIDTH-1:0]  start_macro;
     logic [ADDR_WIDTH-1:0]       window_size;
     logic [3:0]                  mode;
-    logic [15:0]                 window_id;
+    logic [31:0]                 window_id;
     logic [95:0]                 payload;
   } job_pkt_t;
 

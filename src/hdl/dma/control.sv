@@ -31,20 +31,23 @@ module control #(
 
   // Ingress IF
   output logic [N_STREAMS-1:0]       stream_en_o,
-  output logic [ADDR_WIDTH-1:0]      window_size_o  [N_STREAMS],
-  output logic [MACRO_PTR_WIDTH-1:0] start_macro_o  [N_STREAMS],
+  output logic [ADDR_WIDTH-1:0]      window_size_o     [N_STREAMS],
+  output logic [MACRO_PTR_WIDTH-1:0] start_macro_o     [N_STREAMS],
 
   // Egress IF
   output logic [N_STREAMS-1:0]    cfg_push_o,
   output logic [4*DATA_WIDTH-1:0] cfg_wdata_o [N_STREAMS],
 
   // Topology IF
-  output logic [MACRO_PTR_WIDTH-1:0] next_pointer_o [M_MACROS]
+  output logic [MACRO_PTR_WIDTH-1:0] next_pointer_o [M_MACROS],
+
+  // Stream Generator IF
+  output logic [DATA_WIDTH-1:0] stream_interval_o [N_STREAMS]
 );
 
   logic wr_en;
-  assign wr_en = psel_i & penable_i & pwrite_i;
-  assign pready_o = 1'b1;
+  assign pready_o = psel_i & penable_i;
+  assign wr_en = pready_o & pwrite_i;
   assign pslverr_o = 1'b0;
 
   logic [DATA_WIDTH-1:0] global_ctrl_q;
@@ -63,22 +66,27 @@ module control #(
 
   logic [MACRO_PTR_WIDTH-1:0] next_pointer_q    [M_MACROS];
 
+  logic [DATA_WIDTH-1:0] stream_interval_q [N_STREAMS];
+
   // 0x0000 - 0x0FFF: Global Configuration
   // 0x1000 - 0x1FFF: Stream Configurations
   // 0x2000 - 0x2FFF: Topology Configuration
-  logic is_global_cfg, is_stream_cfg, is_topology;
-  assign is_global_cfg = (paddr_i[31:12] == 20'h000);
-  assign is_stream_cfg = (paddr_i[31:12] == 20'h001);
-  assign is_topology   = (paddr_i[31:12] == 20'h002);
+  logic is_global_cfg, is_stream_cfg, is_topology, is_stream_interval;
+  assign is_global_cfg      = (paddr_i[31:12] == 20'h000);
+  assign is_stream_cfg      = (paddr_i[31:12] == 20'h001);
+  assign is_topology        = (paddr_i[31:12] == 20'h002);
+  assign is_stream_interval = (paddr_i[31:12] == 20'h003);
 
   logic [11:0] global_offset; 
-  logic [5:0]  stream_idx;
-  logic [5:0]  stream_offset;
-  logic [9:0] topology_word_idx;
+  logic [6:0]  stream_idx;
+  logic [4:0]  stream_offset;
+  logic [9:0]  topology_word_idx;
+  logic [9:0]  interval_word_idx;
   assign global_offset     = paddr_i[11:0];
-  assign stream_idx        = paddr_i[11:6];
-  assign stream_offset     = paddr_i[5:0];
+  assign stream_idx        = paddr_i[11:5];
+  assign stream_offset     = paddr_i[4:0];
   assign topology_word_idx = paddr_i[11:2];
+  assign interval_word_idx = paddr_i[11:2];
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -97,6 +105,8 @@ module control #(
       cfg_wdata_q       <= '{default: '0};
 
       next_pointer_q    <= '{default: '0};
+
+      stream_interval_q <= '{default: '0};
     end else begin
       cfg_push_q <= '{default: 1'b0}; 
       if (wr_en) begin
@@ -115,21 +125,18 @@ module control #(
         // Stream Configurations
         else if (is_stream_cfg && (stream_idx < N_STREAMS)) begin
           case (stream_offset)
-            6'h00: start_macro_q[stream_idx]     <= MACRO_PTR_WIDTH'(pwdata_i);
-            6'h04: window_size_q[stream_idx]     <= pwdata_i;
-            6'h08: stream_en_q[stream_idx]       <= pwdata_i[0];
-            6'h10: egress_shadow_0_q[stream_idx] <= pwdata_i; 
-            6'h14: egress_shadow_1_q[stream_idx] <= pwdata_i;
-            6'h18: egress_shadow_2_q[stream_idx] <= pwdata_i;
+            5'h00: start_macro_q[stream_idx]     <= MACRO_PTR_WIDTH'(pwdata_i);
+            5'h04: window_size_q[stream_idx]     <= pwdata_i;
+            5'h08: stream_en_q[stream_idx]       <= pwdata_i[0];
+            5'h10: egress_shadow_0_q[stream_idx] <= pwdata_i; 
+            5'h14: egress_shadow_1_q[stream_idx] <= pwdata_i;
+            5'h18: egress_shadow_2_q[stream_idx] <= pwdata_i;
+            5'h1C: begin
+              cfg_push_q[stream_idx]  <= 1'b1;
+              cfg_wdata_q[stream_idx] <= {egress_shadow_0_q[stream_idx], egress_shadow_1_q[stream_idx], egress_shadow_2_q[stream_idx], pwdata_i};
+            end
             default: ;
           endcase
-
-          if (stream_offset == 6'h1C) begin
-            cfg_push_q[stream_idx]  <= 1'b1;
-            cfg_wdata_q[stream_idx] <= {egress_shadow_0_q[stream_idx], egress_shadow_1_q[stream_idx], egress_shadow_2_q[stream_idx], pwdata_i};
-          end else begin
-            cfg_push_q[stream_idx]  <= 1'b0;
-          end
         end
 
         // Topology Configuration
@@ -139,6 +146,13 @@ module control #(
 
           if (macro_idx_0 < M_MACROS) next_pointer_q[macro_idx_0] <= MACRO_PTR_WIDTH'(pwdata_i[15:0]);
           if (macro_idx_1 < M_MACROS) next_pointer_q[macro_idx_1] <= MACRO_PTR_WIDTH'(pwdata_i[31:16]);
+        end
+
+        // Stream Interval Configuration
+        else if (is_stream_interval) begin
+          if (interval_word_idx < N_STREAMS) begin
+            stream_interval_q[interval_word_idx] <= pwdata_i;
+          end
         end
 
       end
@@ -158,5 +172,7 @@ module control #(
   assign cfg_wdata_o   = cfg_wdata_q;
 
   assign next_pointer_o = next_pointer_q;
+
+  assign stream_interval_o = stream_interval_q;
 
 endmodule

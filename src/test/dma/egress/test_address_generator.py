@@ -329,7 +329,6 @@ async def test_addr_generator_crv(dut):
     config_randomizer = ConfigRandomizer(n_streams, m_macros, macro_depth)
 
     for i in range(10):
-        
         config_per_stream, topology = config_randomizer.generate_configs()
         
         await driver.set_topology(topology)

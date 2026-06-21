@@ -41,7 +41,8 @@ class ConfigRandomizer:
             configs[stream_idx] = {
                 'window_size': window_sizes[i],
                 'start_macro': macros[0],
-                'topology': topology
+                'topology': topology,
+                'interval': rnd.randint(1, 256)
             }
             
             result_topology.update(topology)

@@ -6,7 +6,10 @@ module job_manager #(
   parameter int FIFO_DEPTH    = 8,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS)
+  localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
+
+  localparam int STREAM_ID_WIDTH = 7,
+  localparam int LOCAL_ID_WIDTH  = DATA_WIDTH - STREAM_ID_WIDTH
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -177,7 +180,10 @@ module job_manager #(
         us_job_data.stream_id   = STREAM_PTR_WIDTH'(i);
         us_job_data.start_macro = notif_data[i];
         us_job_data.window_size = window_size_i[i];
-        us_job_data.window_id   = current_cfg_q[i].window_id;
+        us_job_data.window_id   = {
+          16'(i),
+          current_cfg_q[i].window_id
+        };
 
         if (effective_active[i]) begin
           us_job_data.mode    = effective_cfg[i].mode;

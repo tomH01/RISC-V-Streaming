@@ -127,7 +127,7 @@ class GoldenModel:
                     'start_macro': start_macro,
                     'window_size': st['window_size'],
                     'mode': st['current_cfg']['mode'] if (st['current_cfg'] and is_active) else 0,
-                    'window_id': st['current_window_id'],
+                    'window_id': (grant_id << 16) | st['current_window_id'],
                     'payload': st['current_cfg']['payload'] if (st['current_cfg'] and is_active) else 0
                 }
                 

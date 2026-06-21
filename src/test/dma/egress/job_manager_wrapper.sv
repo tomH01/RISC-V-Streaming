@@ -18,11 +18,11 @@ module job_manager_wrapper #(
   output logic                 dbg_us_job_valid_o,
 
   // Notification IF
-  input logic                       notif_valid_i       [N_STREAMS],
+  input logic [N_STREAMS-1:0]       notif_valid_i,
   input logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_i [N_STREAMS],
 
   // Control IF
-  input logic                    cfg_push_i    [N_STREAMS],
+  input logic [N_STREAMS-1:0]    cfg_push_i,
   input logic [4*DATA_WIDTH-1:0] cfg_wdata_i   [N_STREAMS],
   
   input logic [ADDR_WIDTH-1:0]   window_size_i [N_STREAMS],
@@ -35,7 +35,7 @@ module job_manager_wrapper #(
   output logic [MACRO_PTR_WIDTH-1:0]  job_start_macro_o,
   output logic [ADDR_WIDTH-1:0]       job_window_size_o, 
   output logic [3:0]                  job_mode_o,
-  output logic [15:0]                 job_window_id_o,
+  output logic [31:0]                 job_window_id_o,
   output logic [95:0]                 job_payload_o
 );
 

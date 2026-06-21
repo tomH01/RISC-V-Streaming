@@ -11,9 +11,9 @@ module ingress_top #(
   input logic rst_ni,
 
   // Stream IF
-  input  logic                  stream_valid_i [N_STREAMS],
+  input  logic [N_STREAMS-1:0] stream_valid_i,
   input  logic [DATA_WIDTH-1:0] stream_data_i  [N_STREAMS],
-  output logic                  stream_ready_o [N_STREAMS],
+  output logic [N_STREAMS-1:0]  stream_ready_o,
 
   // Buffer Pool IF
   input  logic [M_MACROS-1:0]   bp_gnt_i,
