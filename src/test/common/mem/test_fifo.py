@@ -77,6 +77,9 @@ async def fifo_driver(dut, data_width):
         
         
 async def fifo_monitor(dut, scoreboard):
+    was_pop = False
+    expected_data = None
+    
     while True:
         await ReadOnly()
         
@@ -84,26 +87,29 @@ async def fifo_monitor(dut, scoreboard):
         pop = int(dut.pop_i.value)
         empty = int(dut.empty_o.value)
         full = int(dut.full_o.value)
-        dout = int(dut.data_o.value) if not empty else None
         
         cover_fifo(push, pop, empty, full)
         
         assert empty == scoreboard.is_empty(), f"Empty signal mismatch: Expected {scoreboard.is_empty()}, got {empty}"
         assert full == scoreboard.is_full(), f"Full signal mismatch: Expected {scoreboard.is_full()}, got {full}"
-        if not empty:
-            assert dout == scoreboard.peek(), f"Data output mismatch: Expected {scoreboard.peek()}, got {dout}"
-        
+
+        if was_pop:
+            dout = int(dut.data_o.value)
+            assert dut.data_o.value == expected_data, f"Data mismatch: Expected {expected_data}, got {dut.data_o.value}"
+            was_pop = False
+
         if push and not full:
             scoreboard.push(int(dut.data_i.value))
             
         if pop and not empty:
-            scoreboard.pop()
+            expected_data = scoreboard.pop()
+            was_pop = True
             
         await RisingEdge(dut.clk_i)
    
     
 @cocotb.test()
-async def test_fwft_fifo_crv(dut):
+async def test_fifo_crv(dut):
     DEPTH = int(params["DEPTH"])
     DATA_WIDTH = int(params["DATA_WIDTH"])
 

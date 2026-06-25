@@ -1,4 +1,4 @@
-module fwft_fifo #(
+module fifo #(
   parameter int DATA_WIDTH = 32,
   parameter int DEPTH      = 8
 )(
@@ -23,8 +23,6 @@ module fwft_fifo #(
   assign full_o  = (count_q == DEPTH);
   assign empty_o = (count_q == 0);
 
-  assign data_o = mem[rd_ptr_q];
-
   logic push, pop;
   assign push = push_i && !full_o;
   assign pop  = pop_i  && !empty_o;
@@ -35,12 +33,14 @@ module fwft_fifo #(
       count_q  <= '0;
       wr_ptr_q <= '0;
       rd_ptr_q <= '0;
+      data_o   <= '0;
     end else begin
       if (push) begin
         mem[wr_ptr_q] <= data_i;
         wr_ptr_q      <= (wr_ptr_q == DEPTH-1) ? '0 : wr_ptr_q + 1;
       end
       if (pop) begin
+        data_o   <= mem[rd_ptr_q];
         rd_ptr_q <= (rd_ptr_q == DEPTH-1) ? '0 : rd_ptr_q + 1;
       end
 
@@ -51,5 +51,5 @@ module fwft_fifo #(
       end
     end
   end
-
+  
 endmodule

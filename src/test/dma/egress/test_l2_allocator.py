@@ -17,11 +17,14 @@ params = get_design_parameters()
 class L2AllocatorDriver:
     def __init__(self, dut, b_banks, w_workers):   
         self.dut = dut
+        
         self.b_banks = b_banks
         self.w_workers = w_workers
+        self.job_length = self._get_job_length()
         
-        self.job_length = self.get_job_length()
+        self._init_signals()
         
+    def _init_signals(self):
         self.dut.stream_id_i.value = 0
         self.dut.start_macro_i.value = 0
         self.dut.window_size_i.value = 0
@@ -35,8 +38,13 @@ class L2AllocatorDriver:
             self.dut.l2_bank_base_i[b].value = 0
         self.dut.bank_limit_b_i.value = 0
         self.dut.bank_header_size_b_i.value = 0
+        self.dut.bank_owner_i.value = 0
+        self.dut.bank_full_o.value = 0
         
         self.dut.worker_done_i.value = 0
+        
+        self.dut.meta_done_i.value = 0
+        self.dut.meta_ready_i.value = 0
 
     async def reset(self):
         self.dut.job_valid_i.value = 0
@@ -102,8 +110,40 @@ class L2AllocatorDriver:
         
         ones_indices = rnd.sample(busy_indices, num_dones)
         self.dut.worker_done_i.value = sum(1 << i for i in ones_indices)
+        
+    def start_mocks(self):
+        mock_meta_task = cocotb.start_soon(self._mock_meta_writer())
+        mock_cpu_task = cocotb.start_soon(self._mock_cpu())
+        return mock_meta_task, mock_cpu_task
 
-    def get_job_length(self):
+    async def _mock_meta_writer(self):
+        while True:
+            await RisingEdge(self.dut.clk_i)
+            self.dut.meta_ready_i.value = int(rnd.random() < 0.8)
+            self.dut.meta_done_i.value = 0
+            await ReadOnly()
+            if self.dut.meta_close_bank_o.value == 1 and self.dut.meta_valid_o.value == 1 and self.dut.meta_ready_i.value == 1:
+                await ClockCycles(self.dut.clk_i, rnd.randint(5, 40))
+                self.dut.meta_done_i.value = 1
+    
+    async def _mock_cpu(self):
+        owned_banks = set()
+        
+        while True:
+            await RisingEdge(self.dut.clk_i)
+            for b in list(owned_banks):
+                if rnd.random() < 0.05:
+                    owned_banks.remove(b)
+            
+            for b in range(self.b_banks):
+                self.dut.bank_owner_i[b].value = int(b in owned_banks)
+                
+            await ReadOnly()
+            for b in range(self.b_banks):
+                if self.dut.bank_full_o[b].value == 1:
+                    owned_banks.add(b)
+
+    def _get_job_length(self):
         stream_id_len = len(self.dut.stream_id_i)
         start_macro_len = len(self.dut.start_macro_i)
         window_size_len = len(self.dut.window_size_i)
@@ -114,7 +154,7 @@ class L2AllocatorDriver:
         
     def _create_rnd_job(self, offset, window_size, window_size_len):
         clean_mask = ~(((1 << window_size_len) - 1) << offset)
-        packed_job = int(rnd.getrandbits(self.job_length))
+        packed_job = int(rnd.getrandbits(self._get_job_length()))
         packed_job &= clean_mask
         packed_job |= (window_size << offset)
         return packed_job
@@ -125,11 +165,12 @@ class GoldenModel:
         self.dut = dut
         self.scoreboard = score_board
         
+        self.data_width = int(params["DATA_WIDTH"])
         self.b_banks = b_banks
         self.w_workers = w_workers
-        self.bank_header_size = None
-        self.bank_limit = None
-        self.bank_bases = None
+        self.bank_header_size = 0
+        self.bank_limit = 0
+        self.bank_bases = []
         
         self.state = {
             'current_bank': None,
@@ -166,15 +207,17 @@ class GoldenModel:
             
             
             window_size = int(self.dut.window_size_i.value)
-            window_size_b = window_size * 4
+            window_size_b = window_size * self.data_width // 8
             
             job_valid = int(self.dut.job_valid_i.value)
+            meta_ready = int(self.dut.meta_ready_i.value)
             next_bank_idx = self.get_bank_idx(window_size_b)
             worker_idx = self.get_idle_worker()
             
             # Dispatch
-            if job_valid and next_bank_idx is not None and worker_idx is not None:
-                if self.fits_in_current_bank(window_size_b):
+            if job_valid and next_bank_idx is not None and worker_idx is not None and meta_ready:
+                fits = self.fits_in_current_bank(window_size_b)
+                if fits:
                     addr_out = self.state["current_addr"]
                     self.state["current_addr"] += window_size_b
                 else:
@@ -184,7 +227,7 @@ class GoldenModel:
                 
                 self.state["bank_assignments"][next_bank_idx].add(worker_idx)
                 
-                result = {
+                job = {
                     'job_wid': worker_idx,
                     'job_addr': addr_out,
                     'job_bank': next_bank_idx,
@@ -195,7 +238,15 @@ class GoldenModel:
                     'window_id': int(self.dut.window_id_i.value),
                     'payload': int(self.dut.payload_i.value)
                 }
-                self.scoreboard.add_expected(result)         
+                self.scoreboard.add_expected_job(job)   
+                
+                meta = {
+                    'close_bank': int(not fits),
+                    'bank_idx': next_bank_idx,
+                    'window_id': int(self.dut.window_id_i.value),
+                    'window_size': window_size << self.data_width // 8,
+                }
+                self.scoreboard.add_expected_meta(meta)
                 
             self.discard_assignments(self.dut.worker_done_i)
             
@@ -215,7 +266,9 @@ class GoldenModel:
     def is_bank_busy(self, bank_idx):
         is_active = (bank_idx == self.state["current_bank"])
         has_active_workers = len(self.state["bank_assignments"][bank_idx]) > 0
-        return is_active or has_active_workers
+        cpu_owns_bank = int(self.dut.bank_owner_i[bank_idx].value) == 1
+        
+        return is_active or has_active_workers or cpu_owns_bank
     
     def get_idle_worker(self):
         for i in range(self.w_workers):
@@ -235,8 +288,8 @@ class GoldenModel:
                     
     def get_busy_workers(self):
         return set().union(*self.state["bank_assignments"])
+      
         
-            
 class OutputMonitor:
     def __init__(self, dut, scoreboard):
         self.dut = dut
@@ -248,7 +301,7 @@ class OutputMonitor:
             await ReadOnly()
             
             if self.dut.job_valid_o.value:
-                result = {
+                job = {
                     'job_wid': int(self.dut.job_wid_o.value),
                     'job_addr': int(self.dut.job_addr_o.value),
                     'job_bank': int(self.dut.job_bank_o.value),
@@ -259,25 +312,44 @@ class OutputMonitor:
                     'window_id': int(self.dut.window_id_o.value),
                     'payload': int(self.dut.payload_o.value)
                 }
-                self.scoreboard.add_actual(result)         
+                self.scoreboard.add_actual_job(job)   
+                
+            if self.dut.meta_valid_o.value:
+                meta = {
+                    'close_bank': int(self.dut.meta_close_bank_o.value),
+                    'bank_idx': int(self.dut.meta_bank_idx_o.value),
+                    'window_id': int(self.dut.meta_window_id_o.value),
+                    'window_size': int(self.dut.meta_window_size_o.value) << 2
+                }
+                self.scoreboard.add_actual_meta(meta)      
             
             
 class Scoreboard:
     def __init__(self, dut):
         self.dut = dut
-        self.expected_q = Queue()
-        self.actual_q = Queue()
+        self.expected_job_q = Queue()
+        self.actual_job_q = Queue()
+        self.expected_meta_q = Queue()
+        self.actual_meta_q = Queue()
+        self.added = 0
+
+    def add_expected_job(self, value):
+        self.expected_job_q.put_nowait(value)
         
-    def add_expected(self, value):
-        self.expected_q.put_nowait(value)
+    def add_actual_job(self, value):
+        self.actual_job_q.put_nowait(value)
+        self.added += 1
         
-    def add_actual(self, value):
-        self.actual_q.put_nowait(value)
+    def add_expected_meta(self, value):
+        self.expected_meta_q.put_nowait(value)
         
-    async def compare(self):
+    def add_actual_meta(self, value):
+        self.actual_meta_q.put_nowait(value)
+        
+    async def compare_jobs(self):
         while True:
-            exp = await self.expected_q.get()
-            act = await self.actual_q.get()
+            exp = await self.expected_job_q.get()
+            act = await self.actual_job_q.get()
                         
             assert exp['job_wid'] == act['job_wid'], f"Expected worker ID {exp['job_wid']}, got {act['job_wid']}"
             assert exp['job_addr'] == act['job_addr'], f"Expected job address {exp['job_addr']}, got {act['job_addr']}"
@@ -289,15 +361,32 @@ class Scoreboard:
             assert exp['window_id'] == act['window_id'], f"Expected window ID {exp['window_id']}, got {act['window_id']}"
             assert exp['payload'] == act['payload'], f"Expected payload {exp['payload']}, got {act['payload']}"
 
+    async def compare_meta(self):
+        while True:
+            exp = await self.expected_meta_q.get()
+            act = await self.actual_meta_q.get()
+            
+            if exp != act:
+                await RisingEdge(self.dut.clk_i)
+            
+            assert exp['close_bank'] == act['close_bank'], f"Expected close bank {exp['close_bank']}, got {act['close_bank']}"
+            assert exp['bank_idx'] == act['bank_idx'], f"Expected bank index {exp['bank_idx']}, got {act['bank_idx']}"
+            assert exp['window_id'] == act['window_id'], f"Expected window ID {exp['window_id']}, got {act['window_id']}"
+            assert exp['window_size'] == act['window_size'], f"Expected window size {exp['window_size']}, got {hex(act['window_size'])}"
+            
     def clear(self):
-        while not self.expected_q.empty():
-            self.expected_q.get_nowait()
-        while not self.actual_q.empty():
-            self.actual_q.get_nowait()
+        while not self.expected_job_q.empty():
+            self.expected_job_q.get_nowait()
+        while not self.actual_job_q.empty():
+            self.actual_job_q.get_nowait()
+        while not self.expected_meta_q.empty():
+            self.expected_meta_q.get_nowait()
+        while not self.actual_meta_q.empty():
+            self.actual_meta_q.get_nowait()
             
     async def run(self):
-        await self.compare() 
-           
+        cocotb.start_soon(self.compare_jobs())
+        cocotb.start_soon(self.compare_meta())
 
 @cocotb.test()
 async def test_l2_allocator_crv(dut):
@@ -308,9 +397,6 @@ async def test_l2_allocator_crv(dut):
     w_workers = int(params["W_WORKERS"])
     
     driver = L2AllocatorDriver(dut, b_banks, w_workers)
-    score_board = Scoreboard(dut)
-    golden_model = GoldenModel(dut, score_board, b_banks, w_workers)
-    output_monitor = OutputMonitor(dut, score_board)
     
     for i in range(100):
         print(i)
@@ -321,16 +407,19 @@ async def test_l2_allocator_crv(dut):
         await driver.initialize(start_bank_idx, bank_bases, bank_limit, bank_header_size)
         await driver.reset()
         
-        score_board.clear()
+        score_board = Scoreboard(dut)
+        golden_model = GoldenModel(dut, score_board, b_banks, w_workers)
+        output_monitor = OutputMonitor(dut, score_board)
         
-        golden_model.reset()
         await golden_model.initialize()   
+        
+        mock_meta_task, mock_cpu_taks =  driver.start_mocks()
         score_board_task = cocotb.start_soon(score_board.run())
         golden_model_task = cocotb.start_soon(golden_model.run())   
         output_monitor_task = cocotb.start_soon(output_monitor.monitor()) 
         
         NUM_CYCLES = 1000
-        for _ in range(NUM_CYCLES): 
+        for j in range(NUM_CYCLES): 
             await RisingEdge(dut.clk_i)
             dut.job_valid_i.value = 0 
             dut.worker_done_i.value = 0
@@ -342,6 +431,8 @@ async def test_l2_allocator_crv(dut):
             if rnd.random() < 0.1:
                 await driver.set_done_vector(golden_model.get_busy_workers())
 
+        mock_meta_task.kill()
+        mock_cpu_taks.kill()
         score_board_task.kill()
         golden_model_task.kill()
         output_monitor_task.kill()

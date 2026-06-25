@@ -60,6 +60,17 @@ $skid_buffer addPythonSimFiles [concat $global_sim_files [list \
 ]]
 
 
+set fifo [EDA::Design::createComponent fifo]
+
+$fifo addHDLSourceFiles [list \
+  "src/hdl/common/mem/fifo.sv" \
+]
+
+$fifo addPythonSimFiles [concat $global_sim_files [list \
+  "src/test/common/mem/test_fifo.py" \
+]]
+
+
 set fwft_fifo [EDA::Design::createComponent fwft_fifo]
 
 $fwft_fifo addHDLSourceFiles [list \

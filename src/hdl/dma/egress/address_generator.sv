@@ -62,7 +62,7 @@ module address_generator #(
   logic [MACRO_PTR_WIDTH-1:0]  start_macro_id_q, start_macro_id_d;
   logic [ADDR_WIDTH-1:0]       window_size_q,    window_size_d;
   agu_mode_e                   agu_mode_q,       agu_mode_d;
-  logic [15:0]                 window_id_q,      window_id_d;
+  logic [DATA_WIDTH-1:0]       window_id_q,      window_id_d;
   logic [95:0]                 payload_q,        payload_d;
   logic [ADDR_WIDTH-1:0]       base_addr_q,      base_addr_d;
   logic [BANK_PTR_WIDTH-1:0]   bank_idx_q,       bank_idx_d;

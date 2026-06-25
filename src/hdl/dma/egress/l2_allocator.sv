@@ -16,10 +16,12 @@ module l2_allocator #(
   job_if.rx_ready job_req_i,
 
   // Control IF
-  input logic [BANK_PTR_WIDTH-1:0] start_bank_idx_i,
-  input logic [DATA_WIDTH-1:0]     l2_bank_base_i [B_BANKS],
-  input logic [DATA_WIDTH-1:0]     bank_limit_b_i,
-  input logic [DATA_WIDTH-1:0]     bank_header_size_b_i,
+  input  logic [BANK_PTR_WIDTH-1:0] start_bank_idx_i,
+  input  logic [DATA_WIDTH-1:0]     l2_bank_base_i [B_BANKS],
+  input  logic [DATA_WIDTH-1:0]     bank_limit_b_i,
+  input  logic [DATA_WIDTH-1:0]     bank_header_size_b_i,
+  input  logic [B_BANKS-1:0]        bank_owner_i,
+  output logic [B_BANKS-1:0]        bank_full_o,
 
   // Worker IF
   input  logic [W_WORKERS-1:0]        worker_done_i,
@@ -27,20 +29,30 @@ module l2_allocator #(
   output logic [ADDR_WIDTH-1:0]       job_addr_o,
   output logic [BANK_PTR_WIDTH-1:0]   job_bank_o,
 
-  job_if.tx_push                      job_assign_o
-  // BUS IF:
-  // TODO
-  
-);
+  job_if.tx_push                      job_assign_o,
+
+  // Meta Writer IF:
+  input  logic                      meta_done_i,
+  input  logic                      meta_ready_i,
+  output logic                      meta_valid_o,
+  output logic                      meta_close_bank_o,
+  output logic [BANK_PTR_WIDTH-1:0] meta_bank_idx_o,
+  output logic [DATA_WIDTH-1:0]     meta_window_id_o,
+  output logic [DATA_WIDTH-1:0]     meta_window_size_o
+  );
 
   typedef job_req_i.job_pkt_t job_pkt_t;
 
-  logic [B_BANKS-1:0]        bank_busy_q, bank_busy_d;
-  logic [BANK_PTR_WIDTH-1:0] active_bank_q, active_bank_d;
-  logic [DATA_WIDTH-1:0]     bank_offset_q, bank_offset_d;
+  logic [B_BANKS-1:0]        bank_busy_q,     bank_busy_d;
+  logic [BANK_PTR_WIDTH-1:0] active_bank_q,   active_bank_d;
+  logic [DATA_WIDTH-1:0]     bank_offset_q,   bank_offset_d;
 
   logic [W_WORKERS-1:0]      bank_worker_busy_q [B_BANKS];
   logic [W_WORKERS-1:0]      bank_worker_busy_d [B_BANKS];
+
+  logic [B_BANKS-1:0]        bank_draining_q, bank_draining_d;
+  logic [B_BANKS-1:0]        bank_meta_done_q, bank_meta_done_d;
+  logic [B_BANKS-1:0]        bank_full_d;
 
 
   // Priority Encoder for Idle Workers
@@ -81,12 +93,21 @@ module l2_allocator #(
   assign target_bank = fits_in_current_bank ? active_bank_q : next_bank;
 
   logic target_bank_ready;
-  assign target_bank_ready = fits_in_current_bank | ~(bank_busy_q[next_bank]);
+  assign target_bank_ready = fits_in_current_bank | 
+                             (~bank_busy_q[next_bank] & ~bank_owner_i[next_bank]);
 
+
+  logic ready_cond;
   logic do_dispatch;
-  assign do_dispatch = job_req_i.valid && target_bank_ready && has_idle_worker;
+  assign ready_cond      = target_bank_ready && has_idle_worker && meta_ready_i;
+  assign do_dispatch     = job_req_i.valid && ready_cond;
+  assign job_req_i.ready = ready_cond;
 
-  assign job_req_i.ready = do_dispatch;
+  assign meta_valid_o       = do_dispatch;
+  assign meta_close_bank_o  = ~fits_in_current_bank;
+  assign meta_bank_idx_o    = target_bank;
+  assign meta_window_id_o   = job_req_i.pkt.window_id;
+  assign meta_window_size_o = current_job_size;
 
   // Registered outputs
   job_pkt_t                    job_pkt_q;
@@ -97,8 +118,11 @@ module l2_allocator #(
 
   // Next state logic
   always_comb begin
-    active_bank_d = active_bank_q;
-    bank_offset_d  = bank_offset_q;
+    active_bank_d    = active_bank_q;
+    bank_offset_d    = bank_offset_q;
+    bank_draining_d  = bank_draining_q;
+    bank_meta_done_d = bank_meta_done_q;
+    bank_full_d      = '0;
 
     for (int b = 0; b < B_BANKS; b++) begin
       bank_worker_busy_d[b] = bank_worker_busy_q[b];
@@ -115,9 +139,9 @@ module l2_allocator #(
       bank_worker_busy_d[target_bank][idle_wid] = 1'b1;
 
       if (fits_in_current_bank) begin
-        bank_offset_d = bank_offset_q + current_job_size;
+        bank_offset_d   = bank_offset_q + current_job_size;
       end else begin
-        bank_offset_d = current_job_size;
+        bank_offset_d   = current_job_size;
       end
     end
 
@@ -125,6 +149,24 @@ module l2_allocator #(
     for (int b = 0; b < B_BANKS; b++) begin
       bank_busy_d[b] = (BANK_PTR_WIDTH'(b) == active_bank_d) || (|bank_worker_busy_d[b]);
     end
+
+    // Bank Draining logic
+    for (int b = 0; b < B_BANKS; b++) begin
+      if (do_dispatch && !fits_in_current_bank && (active_bank_q == BANK_PTR_WIDTH'(b))) begin
+        bank_draining_d[b]  = 1'b1;
+        bank_meta_done_d[b] = 1'b0;
+      end
+
+      if (meta_done_i && bank_draining_q[b]) begin
+        bank_meta_done_d[b] = 1'b1;
+      end
+
+      if (bank_draining_q[b] && !bank_busy_d[b] && bank_meta_done_d[b]) begin
+        bank_draining_d[b]  = 1'b0;
+        bank_meta_done_d[b] = 1'b0;
+        bank_full_d[b]      = 1'b1;
+      end
+    end    
   end
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
@@ -133,6 +175,9 @@ module l2_allocator #(
       bank_offset_q      <= '0;
       bank_busy_q        <= '0;
       bank_worker_busy_q <= '{default:'0};
+      bank_draining_q    <= '0;
+      bank_meta_done_q   <= '0;
+      bank_full_o        <= '0;
 
       job_valid_q        <= 1'b0;
       job_wid_q          <= '0;
@@ -144,6 +189,9 @@ module l2_allocator #(
       bank_offset_q      <= bank_offset_d;
       bank_busy_q        <= bank_busy_d;
       bank_worker_busy_q <= bank_worker_busy_d;
+      bank_draining_q    <= bank_draining_d;
+      bank_meta_done_q   <= bank_meta_done_d;
+      bank_full_o        <= bank_full_d;
 
       job_valid_q        <= do_dispatch;
       if (do_dispatch) begin

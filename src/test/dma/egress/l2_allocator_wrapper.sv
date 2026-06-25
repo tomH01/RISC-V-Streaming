@@ -19,7 +19,7 @@ module l2_allocator_wrapper #(
   input logic [MACRO_PTR_WIDTH-1:0]  start_macro_i,
   input logic [ADDR_WIDTH-1:0]       window_size_i,
   input logic [3:0]                  mode_i,
-  input logic [15:0]                 window_id_i,
+  input logic [DATA_WIDTH-1:0]       window_id_i,
   input logic [95:0]                 payload_i,
   input logic                        job_valid_i,
   output logic                       job_ready_o,
@@ -29,6 +29,8 @@ module l2_allocator_wrapper #(
   input logic [DATA_WIDTH-1:0]     l2_bank_base_i [B_BANKS],
   input logic [DATA_WIDTH-1:0]     bank_limit_b_i,
   input logic [DATA_WIDTH-1:0]     bank_header_size_b_i,
+  input  logic [B_BANKS-1:0]       bank_owner_i,
+  output logic [B_BANKS-1:0]       bank_full_o,
 
   // Worker IF
   input  logic [W_WORKERS-1:0]        worker_done_i,
@@ -42,12 +44,17 @@ module l2_allocator_wrapper #(
   output logic [MACRO_PTR_WIDTH-1:0]  start_macro_o,
   output logic [ADDR_WIDTH-1:0]       window_size_o,
   output logic [3:0]                  mode_o,
-  output logic [15:0]                 window_id_o,
-  output logic [95:0]                 payload_o
+  output logic [31:0]                 window_id_o,
+  output logic [95:0]                 payload_o,
 
-  // BUS IF:
-  // TODO
-  
+  // Meta Writer IF:
+  input  logic                      meta_done_i,
+  input  logic                      meta_ready_i,
+  output logic                      meta_valid_o,
+  output logic                      meta_close_bank_o,
+  output logic [BANK_PTR_WIDTH-1:0] meta_bank_idx_o,
+  output logic [DATA_WIDTH-1:0]     meta_window_id_o,
+  output logic [DATA_WIDTH-1:0]     meta_window_size_o
 );
 
   job_if #(
@@ -94,12 +101,23 @@ module l2_allocator_wrapper #(
     .l2_bank_base_i(l2_bank_base_i),
     .bank_limit_b_i(bank_limit_b_i),
     .bank_header_size_b_i(bank_header_size_b_i),
+    .bank_owner_i(bank_owner_i),
+    .bank_full_o(bank_full_o),
 
     .worker_done_i(worker_done_i),
-    .job_assign_o(u_job_assign_if.tx_push),
     .job_wid_o(job_wid_o),
     .job_addr_o(job_addr_o),
-    .job_bank_o(job_bank_o)
+    .job_bank_o(job_bank_o),
+
+    .job_assign_o(u_job_assign_if.tx_push),
+
+    .meta_done_i(meta_done_i),
+    .meta_ready_i(meta_ready_i),
+    .meta_valid_o(meta_valid_o),
+    .meta_close_bank_o(meta_close_bank_o),
+    .meta_bank_idx_o(meta_bank_idx_o),
+    .meta_window_id_o(meta_window_id_o),
+    .meta_window_size_o(meta_window_size_o)
   );
 
 endmodule
