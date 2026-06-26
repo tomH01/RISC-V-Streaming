@@ -15,11 +15,11 @@ params = get_design_parameters()
 
 
 class L2AllocatorDriver:
-    def __init__(self, dut, b_banks, w_workers):   
+    def __init__(self, dut):   
         self.dut = dut
         
-        self.b_banks = b_banks
-        self.w_workers = w_workers
+        self.b_banks = int(params["B_BANKS"])
+        self.w_workers = int(params["W_WORKERS"])
         self.job_length = self._get_job_length()
         
         self._init_signals()
@@ -396,7 +396,7 @@ async def test_l2_allocator_crv(dut):
     b_banks = int(params["B_BANKS"])
     w_workers = int(params["W_WORKERS"])
     
-    driver = L2AllocatorDriver(dut, b_banks, w_workers)
+    driver = L2AllocatorDriver(dut)
     
     for i in range(100):
         print(i)

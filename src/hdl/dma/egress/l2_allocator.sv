@@ -28,17 +28,10 @@ module l2_allocator #(
   output logic [WORKER_PTR_WIDTH-1:0] job_wid_o,
   output logic [ADDR_WIDTH-1:0]       job_addr_o,
   output logic [BANK_PTR_WIDTH-1:0]   job_bank_o,
-
   job_if.tx_push                      job_assign_o,
 
   // Meta Writer IF:
-  input  logic                      meta_done_i,
-  input  logic                      meta_ready_i,
-  output logic                      meta_valid_o,
-  output logic                      meta_close_bank_o,
-  output logic [BANK_PTR_WIDTH-1:0] meta_bank_idx_o,
-  output logic [DATA_WIDTH-1:0]     meta_window_id_o,
-  output logic [DATA_WIDTH-1:0]     meta_window_size_o
+  meta_if.tx_ready meta_req_o
   );
 
   typedef job_req_i.job_pkt_t job_pkt_t;
@@ -99,15 +92,15 @@ module l2_allocator #(
 
   logic ready_cond;
   logic do_dispatch;
-  assign ready_cond      = target_bank_ready && has_idle_worker && meta_ready_i;
+  assign ready_cond      = target_bank_ready && has_idle_worker && meta_req_o.ready;
   assign do_dispatch     = job_req_i.valid && ready_cond;
   assign job_req_i.ready = ready_cond;
 
-  assign meta_valid_o       = do_dispatch;
-  assign meta_close_bank_o  = ~fits_in_current_bank;
-  assign meta_bank_idx_o    = target_bank;
-  assign meta_window_id_o   = job_req_i.pkt.window_id;
-  assign meta_window_size_o = current_job_size;
+  assign meta_req_o.valid           = do_dispatch;
+  assign meta_req_o.pkt.close_bank  = ~fits_in_current_bank;
+  assign meta_req_o.pkt.bank_idx    = target_bank;
+  assign meta_req_o.pkt.window_id   = job_req_i.pkt.window_id;
+  assign meta_req_o.pkt.window_size = current_job_size;
 
   // Registered outputs
   job_pkt_t                    job_pkt_q;
@@ -157,7 +150,7 @@ module l2_allocator #(
         bank_meta_done_d[b] = 1'b0;
       end
 
-      if (meta_done_i && bank_draining_q[b]) begin
+      if (meta_req_o.done && bank_draining_q[b]) begin
         bank_meta_done_d[b] = 1'b1;
       end
 

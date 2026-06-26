@@ -69,7 +69,12 @@ module l2_allocator_wrapper #(
     .ADDR_WIDTH(ADDR_WIDTH)
   ) u_job_assign_if();
 
-  assign u_job_req_if.pkt.stream_id    = stream_id_i;
+  meta_if #(
+    .DATA_WIDTH(DATA_WIDTH),
+    .B_BANKS(B_BANKS)
+  ) u_meta_req_if();
+
+  assign u_job_req_if.pkt.stream_id   = stream_id_i;
   assign u_job_req_if.pkt.start_macro = start_macro_i;
   assign u_job_req_if.pkt.window_size = window_size_i;
   assign u_job_req_if.pkt.mode        = mode_i;
@@ -85,6 +90,14 @@ module l2_allocator_wrapper #(
   assign window_id_o   = u_job_assign_if.pkt.window_id;
   assign payload_o     = u_job_assign_if.pkt.payload;
   assign job_valid_o   = u_job_assign_if.valid;
+
+  assign meta_done_i        = u_meta_req_if.done;
+  assign meta_ready_i       = u_meta_req_if.ready;
+  assign meta_valid_o       = u_meta_req_if.valid;
+  assign meta_close_bank_o  = u_meta_req_if.pkt.close_bank;
+  assign meta_bank_idx_o    = u_meta_req_if.pkt.bank_idx;
+  assign meta_window_id_o   = u_meta_req_if.pkt.window_id;
+  assign meta_window_size_o = u_meta_req_if.pkt.window_size;
 
   l2_allocator #(
     .DATA_WIDTH(DATA_WIDTH),
@@ -108,16 +121,9 @@ module l2_allocator_wrapper #(
     .job_wid_o(job_wid_o),
     .job_addr_o(job_addr_o),
     .job_bank_o(job_bank_o),
-
     .job_assign_o(u_job_assign_if.tx_push),
 
-    .meta_done_i(meta_done_i),
-    .meta_ready_i(meta_ready_i),
-    .meta_valid_o(meta_valid_o),
-    .meta_close_bank_o(meta_close_bank_o),
-    .meta_bank_idx_o(meta_bank_idx_o),
-    .meta_window_id_o(meta_window_id_o),
-    .meta_window_size_o(meta_window_size_o)
+    .meta_req_o(u_meta_req_if.tx_ready)
   );
 
 endmodule

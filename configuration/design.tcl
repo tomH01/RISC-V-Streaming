@@ -161,12 +161,27 @@ set l2_allocator_wrapper [EDA::Design::createComponent l2_allocator_wrapper]
 
 $l2_allocator_wrapper addHDLSourceFiles [list \
   "src/hdl/dma/egress/job_if.sv" \
+  "src/hdl/dma/egress/meta_if.sv" \
   "src/hdl/dma/egress/l2_allocator.sv" \
   "src/test/dma/egress/l2_allocator_wrapper.sv" \
 ]
 
 $l2_allocator_wrapper addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/egress/test_l2_allocator.py" \
+]]
+
+
+set meta_writer_wrapper [EDA::Design::createComponent meta_writer_wrapper]  
+
+$meta_writer_wrapper addHDLSourceFiles [list \
+  "src/hdl/common/mem/fifo.sv" \
+  "src/hdl/dma/egress/meta_if.sv" \
+  "src/hdl/dma/egress/meta_writer.sv" \
+  "src/test/dma/egress/meta_writer_wrapper.sv" \
+]
+
+$meta_writer_wrapper addPythonSimFiles [concat $global_sim_files $tools [list \
+  "src/test/dma/egress/test_meta_writer.py" \
 ]]
 
 
