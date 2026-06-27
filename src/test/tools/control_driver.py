@@ -4,6 +4,9 @@ from cocotb.triggers import RisingEdge
 
 from apb_driver import APBDriver
 
+from utils.python.cocotb import get_design_parameters
+params = get_design_parameters()
+
 
 class ControlDriver:
     
@@ -11,6 +14,12 @@ class ControlDriver:
     STREAM_BASE = 0x1000
     TOPOLOGY_BASE = 0x2000
     INTERVAL_BASE = 0x3000
+    
+    GLOBAL_CONTROL = 0x00
+    BANK_LIMIT_B = 0x04
+    BANK_HEADER_SIZE_B = 0x08
+    RELEASE_BANK = 0x0C
+    BANK_BASE_OFFSET = 0x20    
     
     STREAM_STRIDE = 0x20
     
@@ -23,12 +32,14 @@ class ControlDriver:
     OFF_EGRESS_SHADOW_2 = 0x18
     OFF_EGRESS_TRIGGER = 0x1C
     
-    def __init__(self, dut, n_streams, m_macros):
+    def __init__(self, dut):
         self.dut = dut
-        self.n_streams = n_streams
-        self.m_macros = m_macros
+        self.n_streams = int(params["N_STREAMS"])
+        self.m_macros = int(params["M_MACROS"])
+        self.b_banks = int(params["B_BANKS"])
         
         self.apb = APBDriver(dut)  
+        self.dut.bank_full_i.value = 0
         
     async def reset(self):
         self.dut.rst_ni.value = 0
@@ -36,6 +47,26 @@ class ControlDriver:
         await RisingEdge(self.dut.clk_i)
         self.dut.rst_ni.value = 1
         await RisingEdge(self.dut.clk_i)
+        
+    async def send_global_config(self, config_type, data, bank_idx=None):
+        if config_type == "bank_base" and bank_idx is None:
+            raise ValueError("bank_idx must be provided for bank_base config")
+        
+        match config_type:
+            case "global_ctrl":
+                addr = self.GLOBAL_BASE + self.GLOBAL_CONTROL
+            case "bank_limit_b":
+                addr = self.GLOBAL_BASE + self.BANK_LIMIT_B
+            case "bank_header_size_b":
+                addr = self.GLOBAL_BASE + self.BANK_HEADER_SIZE_B
+            case "release_bank":
+                addr = self.GLOBAL_BASE + self.RELEASE_BANK
+            case "bank_base":
+                addr = self.GLOBAL_BASE + self.BANK_BASE_OFFSET + bank_idx * 0x4
+            case _:
+                raise ValueError(f"Unknown config type: {config_type}")
+                
+        await self.apb.apb_write(addr, data)
         
     async def send_ingress_config(self, config_type, data, stream_id):    
         stream_addr = self.STREAM_BASE + stream_id * self.STREAM_STRIDE
@@ -73,6 +104,9 @@ class ControlDriver:
         packed_data =  (upper_macro << 16) | lower_macro
         
         await self.apb.apb_write(addr, packed_data)
-
         
+    def get_global_control(self, dma_enable, start_bank_idx):
+        dma_bit = (int(dma_enable) & 0x1) << 31
+        bank_idx_bits = int(start_bank_idx)
+        return dma_bit | bank_idx_bits        
     

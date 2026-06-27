@@ -9,7 +9,10 @@ module egress_top #(
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS)
+  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
+  localparam int META_WTR     = 1,
+  localparam int BUS_WIDTH        = W_WORKERS + META_WTR,
+  localparam int META_WRT_BUS_IDX = BUS_WIDTH - META_WTR
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -42,10 +45,10 @@ module egress_top #(
   input logic [4*DATA_WIDTH-1:0] cfg_wdata_i [N_STREAMS],
 
   // Bus IF
-  input  logic                  bus_ready_i [W_WORKERS],
-  output logic                  bus_valid_o [W_WORKERS],
-  output logic [ADDR_WIDTH-1:0] bus_addr_o  [W_WORKERS],
-  output logic [DATA_WIDTH-1:0] bus_wdata_o [W_WORKERS]
+  input  logic                  bus_ready_i [W_WORKERS + META_WTR],
+  output logic                  bus_valid_o [W_WORKERS + META_WTR],
+  output logic [ADDR_WIDTH-1:0] bus_addr_o  [W_WORKERS + META_WTR],
+  output logic [DATA_WIDTH-1:0] bus_wdata_o [W_WORKERS + META_WTR]
 );
 
   // ############
@@ -62,6 +65,11 @@ module egress_top #(
     .M_MACROS(M_MACROS),
     .ADDR_WIDTH(ADDR_WIDTH)
   ) u_job_assign_if();
+
+  meta_if #(
+    .DATA_WIDTH(DATA_WIDTH),
+    .B_BANKS(B_BANKS)
+  ) u_meta_req_if();
 
 
   // ############
@@ -111,14 +119,40 @@ module egress_top #(
     .l2_bank_base_i(l2_bank_base_i),
     .bank_limit_b_i(bank_limit_b_i),
     .bank_header_size_b_i(bank_header_size_b_i),
+    .bank_owner_i(), // TODO
+    .bank_full_o(),  // TODO
 
     .worker_done_i(worker_done),
     .job_wid_o(job_wid),
     .job_addr_o(job_addr),
     .job_bank_o(job_bank),
+    .job_assign_o(u_job_assign_if.tx_push),
 
-    .job_assign_o(u_job_assign_if.tx_push)
+    .meta_req_o(u_meta_req_if.tx_ready)
   );
+
+
+  // ###########
+  // Meta Writer
+
+  meta_writer #(
+    .DATA_WIDTH(DATA_WIDTH),
+    .ADDR_WIDTH(ADDR_WIDTH),
+    .B_BANKS(B_BANKS)
+  ) u_meta_writer (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+
+    .meta_req_i(u_meta_req_if.rx_ready),
+
+    .l2_bank_base_i(l2_bank_base_i),
+
+    .bus_ready_i(bus_ready_i[META_WRT_BUS_IDX]),
+    .bus_valid_o(bus_valid_o[META_WRT_BUS_IDX]),
+    .bus_addr_o(bus_addr_o[META_WRT_BUS_IDX]),
+    .bus_wdata_o(bus_wdata_o[META_WRT_BUS_IDX])
+  );
+
 
 
   // ############

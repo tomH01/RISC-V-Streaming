@@ -6,14 +6,69 @@ import random as rnd
 from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge
 from cocotb.clock import Clock
 
-from utils.python.cocotb import get_design_parameters
-
 from config_randomizer import ConfigRandomizer
 from control_driver import ControlDriver
 
+from utils.python.cocotb import get_design_parameters
 params = get_design_parameters()
         
-
+        
+@cocotb.test()
+async def test_global_control(dut):
+    cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
+    
+    n_streams = int(params["N_STREAMS"])
+    m_macros = int(params["M_MACROS"])
+    b_banks = int(params["B_BANKS"])
+    
+    owner_state = 0
+    
+    driver = ControlDriver(dut)
+    await driver.reset()
+    
+    NUM_CYCLES = 1000
+    for _ in range(NUM_CYCLES):    
+        dma_enable = rnd.choice([0, 1])
+        start_bank_idx = rnd.randrange(0, b_banks)        
+        global_control = driver.get_global_control(dma_enable, start_bank_idx)    
+        await driver.send_global_config("global_ctrl", global_control)
+        await ReadOnly()
+        assert int(dut.dma_enable_o.value) == dma_enable, f"Expected dma_enable_o to be {dma_enable}, got: {dut.dma_enable_o.value}"
+        assert int(dut.start_bank_idx_o.value) == start_bank_idx, f"Expected start_bank_idx_o to be {start_bank_idx}, got: {dut.start_bank_idx_o.value}"
+        await FallingEdge(dut.clk_i)
+        
+        bank_limit_b = rnd.getrandbits(32)
+        await driver.send_global_config("bank_limit_b", bank_limit_b)
+        await ReadOnly()
+        assert int(dut.bank_limit_b_o.value) == bank_limit_b, f"Expected bank_limit_b_o to be {bank_limit_b}, got: {dut.bank_limit_b_o.value}"
+        await FallingEdge(dut.clk_i)
+        
+        bank_header_size_b = rnd.getrandbits(32)
+        await driver.send_global_config("bank_header_size_b", bank_header_size_b)
+        await ReadOnly()
+        assert int(dut.bank_header_size_b_o.value) == bank_header_size_b, f"Expected bank_header_size_b_o to be {bank_header_size_b}, got: {dut.bank_header_size_b_o.value}"
+        await FallingEdge(dut.clk_i)
+        
+        full = rnd.getrandbits(b_banks)
+        owner_state |= full
+        dut.bank_full_i.value = full
+        await RisingEdge(dut.clk_i)
+        dut.bank_full_i.value = 0
+        release_mask = rnd.getrandbits(b_banks)
+        owner_state &= ~release_mask
+        await driver.send_global_config("release_bank", release_mask)
+        await ReadOnly()
+        assert int(dut.bank_owner_o.value) == owner_state, f"Expected bank_owner_o to be {owner_state}, got: {dut.bank_owner_o.value}"
+        await FallingEdge(dut.clk_i)
+        
+        bank_base_idx = rnd.randrange(0, b_banks)
+        bank_base_value = rnd.getrandbits(32)
+        await driver.send_global_config("bank_base", bank_base_value, bank_base_idx)
+        await ReadOnly()
+        assert int(dut.l2_bank_base_o[bank_base_idx].value) == bank_base_value, f"Expected l2_bank_base_o[{bank_base_idx}] to be {bank_base_value}, got: {dut.l2_bank_base_o[bank_base_idx].value}"
+        await FallingEdge(dut.clk_i)   
+               
+        
 @cocotb.test()
 async def test_ingress_control(dut):
     cocotb.start_soon(Clock(dut.clk_i, 10, units='ns').start())
@@ -22,7 +77,7 @@ async def test_ingress_control(dut):
     m_macros = int(params["M_MACROS"])
     macro_depth = int(params["MACRO_DEPTH"])
     
-    driver = ControlDriver(dut, n_streams, m_macros)
+    driver = ControlDriver(dut)
     
     await driver.reset()
     
@@ -72,7 +127,7 @@ async def test_egress_control(dut):
     n_streams = int(params["N_STREAMS"])
     m_macros = int(params["M_MACROS"])
 
-    driver = ControlDriver(dut, n_streams, m_macros)
+    driver = ControlDriver(dut)
     
     await driver.reset()
     
@@ -107,7 +162,7 @@ async def test_stream_interval(dut):
     m_macros = int(params["M_MACROS"])
     macro_depth = int(params["MACRO_DEPTH"])
 
-    driver = ControlDriver(dut, n_streams, m_macros)
+    driver = ControlDriver(dut)
     await driver.reset()
     
     randomizer = ConfigRandomizer(n_streams, m_macros, macro_depth)

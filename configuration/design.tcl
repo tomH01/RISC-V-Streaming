@@ -27,12 +27,15 @@ set ingress_hdl [list \
 set egress_hdl [list \
   "src/hdl/common/flow_control/skid_buffer.sv" \
   "src/hdl/common/mem/fwft_fifo.sv" \
+  "src/hdl/common/mem/fifo.sv" \
   "src/hdl/common/arb/rr_arbiter.sv" \
   "src/hdl/dma/egress/job_if.sv" \
+  "src/hdl/dma/egress/meta_if.sv" \
+  "src/hdl/dma/egress/job_manager.sv" \
+  "src/hdl/dma/egress/l2_allocator.sv" \
+  "src/hdl/dma/egress/meta_writer.sv" \
   "src/hdl/dma/egress/strided_addr_gen.sv" \
   "src/hdl/dma/egress/address_generator.sv" \
-  "src/hdl/dma/egress/l2_allocator.sv" \
-  "src/hdl/dma/egress/job_manager.sv" \
   "src/hdl/dma/egress/egress_top.sv" \
 ]
 
