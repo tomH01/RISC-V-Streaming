@@ -3,6 +3,7 @@ output*/
 __pycache__
 .simvision
 simvision*
+.vscode/
 
 src/hdl/old/
 src/test/old/
