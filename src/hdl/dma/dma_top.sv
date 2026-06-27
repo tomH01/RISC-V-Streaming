@@ -41,6 +41,7 @@ module dma_top #(
   logic [DATA_WIDTH-1:0]      cfg_l2_bank_base [B_BANKS];
   logic [DATA_WIDTH-1:0]      cfg_bank_limit_b;
   logic [DATA_WIDTH-1:0]      cfg_bank_header_size_b;
+  logic [B_BANKS-1:0]         cfg_bank_owner;
   logic [N_STREAMS-1:0]       cfg_stream_en;
   logic [DATA_WIDTH-1:0]      cfg_stream_interval [N_STREAMS];
   logic [ADDR_WIDTH-1:0]      cfg_window_size     [N_STREAMS];
@@ -48,6 +49,8 @@ module dma_top #(
   logic [N_STREAMS-1:0]       cfg_push;   
   logic [4*DATA_WIDTH-1:0]    cfg_wdata           [N_STREAMS];
   logic [MACRO_PTR_WIDTH-1:0] cfg_next_pointer    [M_MACROS];
+
+  logic [B_BANKS-1:0]         egr_bank_full;
 
   control #(
     .N_STREAMS(N_STREAMS),
@@ -74,16 +77,19 @@ module dma_top #(
     .l2_bank_base_o(cfg_l2_bank_base),
     .bank_limit_b_o(cfg_bank_limit_b),
     .bank_header_size_b_o(cfg_bank_header_size_b),
+    .bank_owner_o(cfg_bank_owner),
 
     .stream_en_o(cfg_stream_en),
-    .stream_interval_o(cfg_stream_interval),
     .window_size_o(cfg_window_size),
     .start_macro_o(cfg_start_macro),
 
+    .bank_full_i(egr_bank_full),
     .cfg_push_o(cfg_push),
     .cfg_wdata_o(cfg_wdata),
 
-    .next_pointer_o(cfg_next_pointer)
+    .next_pointer_o(cfg_next_pointer),
+    
+    .stream_interval_o(cfg_stream_interval)
   );
 
 
@@ -195,6 +201,8 @@ module dma_top #(
     .l2_bank_base_i(cfg_l2_bank_base),
     .bank_limit_b_i(cfg_bank_limit_b),
     .bank_header_size_b_i(cfg_bank_header_size_b),
+    .bank_owner_i(bank_owner),
+    .bank_full_o(egr_bank_full),
 
     .stream_en_i(cfg_stream_en),
     .window_size_i(cfg_window_size),

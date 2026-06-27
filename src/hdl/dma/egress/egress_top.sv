@@ -31,10 +31,12 @@ module egress_top #(
   output logic [MACRO_PTR_WIDTH-1:0] bp_macro_sel_o [W_WORKERS],
 
   // Control IF
-  input logic                  start_bank_idx_i,
-  input logic [DATA_WIDTH-1:0] l2_bank_base_i [B_BANKS],
-  input logic [DATA_WIDTH-1:0] bank_limit_b_i,
-  input logic [DATA_WIDTH-1:0] bank_header_size_b_i,
+  input logic                   start_bank_idx_i,
+  input logic  [DATA_WIDTH-1:0] l2_bank_base_i [B_BANKS],
+  input logic  [DATA_WIDTH-1:0] bank_limit_b_i,
+  input logic  [DATA_WIDTH-1:0] bank_header_size_b_i,
+  input logic  [B_BANKS-1:0]    bank_owner_i,
+  output logic [B_BANKS-1:0]    bank_full_o,
 
   input logic [N_STREAMS-1:0]       stream_en_i,
   input logic [ADDR_WIDTH-1:0]      window_size_i  [N_STREAMS],
@@ -119,8 +121,8 @@ module egress_top #(
     .l2_bank_base_i(l2_bank_base_i),
     .bank_limit_b_i(bank_limit_b_i),
     .bank_header_size_b_i(bank_header_size_b_i),
-    .bank_owner_i(), // TODO
-    .bank_full_o(),  // TODO
+    .bank_owner_i(bank_owner_i),
+    .bank_full_o(bank_full_o),
 
     .worker_done_i(worker_done),
     .job_wid_o(job_wid),

@@ -39,6 +39,8 @@ class ControlDriver:
         self.b_banks = int(params["B_BANKS"])
         
         self.apb = APBDriver(dut)  
+        
+    def init_unit_signals(self):
         self.dut.bank_full_i.value = 0
         
     async def reset(self):

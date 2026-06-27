@@ -24,6 +24,7 @@ async def test_global_control(dut):
     owner_state = 0
     
     driver = ControlDriver(dut)
+    driver.init_unit_signals()
     await driver.reset()
     
     NUM_CYCLES = 1000
@@ -78,7 +79,7 @@ async def test_ingress_control(dut):
     macro_depth = int(params["MACRO_DEPTH"])
     
     driver = ControlDriver(dut)
-    
+    driver.init_unit_signals()
     await driver.reset()
     
     randomizer = ConfigRandomizer(n_streams, m_macros, macro_depth)
@@ -128,7 +129,7 @@ async def test_egress_control(dut):
     m_macros = int(params["M_MACROS"])
 
     driver = ControlDriver(dut)
-    
+    driver.init_unit_signals()
     await driver.reset()
     
     config = {i: [0, 0, 0, 0] for i in range(n_streams)}
@@ -163,6 +164,7 @@ async def test_stream_interval(dut):
     macro_depth = int(params["MACRO_DEPTH"])
 
     driver = ControlDriver(dut)
+    driver.init_unit_signals()
     await driver.reset()
     
     randomizer = ConfigRandomizer(n_streams, m_macros, macro_depth)

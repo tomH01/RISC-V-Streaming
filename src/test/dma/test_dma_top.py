@@ -26,7 +26,7 @@ class DMATopDriver:
         self.w_workers = int(params["W_WORKERS"])
         self.m_macros = int(params["M_MACROS"])
         
-        self.ctrl_driver = ControlDriver(dut, self.n_streams, self.m_macros)
+        self.ctrl_driver = ControlDriver(dut)
         
         self._init_signals()
         
