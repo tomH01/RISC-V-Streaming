@@ -109,6 +109,7 @@ class GoldenModel:
                 
                 
                 result = {
+                    "bank": closed_bank,
                     "address": self.bank_bases[closed_bank],
                     "wdata": self.bank_counters[closed_bank]
                 }
@@ -121,6 +122,7 @@ class GoldenModel:
             bank_idx = pkt["bank_idx"]
             address = self.bank_bases[bank_idx] + self.bank_pointers[bank_idx] * self.data_width_bytes
             result = {
+                "bank": bank_idx,
                 "address": address,
                 "wdata": pkt["window_id"]
             }
@@ -130,6 +132,7 @@ class GoldenModel:
             # Write window size
             address = self.bank_bases[bank_idx] + self.bank_pointers[bank_idx] * self.data_width_bytes
             result = {
+                "bank": bank_idx,
                 "address": address,
                 "wdata": pkt["window_size"]
             }
@@ -174,6 +177,7 @@ class OutputMonitor:
             
             if self.dut.bus_valid_o.value and self.dut.bus_ready_i.value:
                 result = {
+                    "bank": int(self.dut.bus_bank_o.value),
                     "address": int(self.dut.bus_addr_o.value),  
                     "wdata": int(self.dut.bus_wdata_o.value),
                 }
@@ -231,7 +235,6 @@ async def test_meta_writer_crv(dut):
     
     NUM_WRITES = 10000
     for i in range(NUM_WRITES):
-        print(i)
         timeout = 10000
         
         for _ in range(timeout):
@@ -253,3 +256,5 @@ async def test_meta_writer_crv(dut):
             else:
                 raise Exception("Timeout waiting for meta_done_o to be 1")
             
+        if i % 1000 == 0:
+            print(f"Progress: {i}/{NUM_WRITES}")

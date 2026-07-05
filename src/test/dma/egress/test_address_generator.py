@@ -178,6 +178,7 @@ class GoldenModel:
         
         for wdata in job['bp_data']:
             expected = {
+                    "bank": job['bank'],
                     "addr": addr,
                     "wdata": wdata
             }
@@ -246,8 +247,7 @@ class Scoreboard:
             exp = await self.expected_bus_q.get()
             act = await self.actual_bus_q.get()
             
-            #print(f"Expected: {hex(exp['wdata'])}, Got: {hex(act['wdata'])}")
-            
+            assert exp["bank"] == act["bank"], f"Expected bus bank {exp['bank']} but got {act['bank']}"
             assert exp["addr"] == act["addr"], f"Expected bus addr {exp['addr']} but got {act['addr']}"
             assert exp["wdata"] == act["wdata"], f"Expected bus wdata {exp['wdata']} but got {act['wdata']}"
             
@@ -304,6 +304,7 @@ class BusMonitor:
             
             if self.dut.bus_valid_o.value == 1 and self.dut.bus_ready_i.value == 1:
                 actual = {
+                    "bank": int(self.dut.bus_bank_o.value),
                     "addr": int(self.dut.bus_addr_o.value),
                     "wdata": int(self.dut.bus_wdata_o.value)
                 }

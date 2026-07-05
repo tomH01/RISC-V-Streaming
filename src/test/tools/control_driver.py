@@ -62,6 +62,7 @@ class ControlDriver:
             case "bank_header_size_b":
                 addr = self.GLOBAL_BASE + self.BANK_HEADER_SIZE_B
             case "release_bank":
+                print(f"Sending release_bank config with data: {data}")
                 addr = self.GLOBAL_BASE + self.RELEASE_BANK
             case "bank_base":
                 addr = self.GLOBAL_BASE + self.BANK_BASE_OFFSET + bank_idx * 0x4
@@ -96,8 +97,8 @@ class ControlDriver:
         await self.apb.apb_write(addr, interval)
         
     async def send_topology_pair(self, macro_idx, total_topology):
-        lower_macro = total_topology.get(macro_idx, None)
-        upper_macro = total_topology.get(macro_idx + 1, None)
+        lower_macro = total_topology.get(macro_idx, macro_idx)
+        upper_macro = total_topology.get(macro_idx + 1, macro_idx + 1)
         
         if lower_macro is None or upper_macro is None:
             return

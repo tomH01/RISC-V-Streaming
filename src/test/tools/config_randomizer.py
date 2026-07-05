@@ -9,7 +9,7 @@ class ConfigRandomizer:
         self.m_macros = m_macros
         self.macro_depth = macro_depth
     
-    def generate_configs(self):
+    def generate_configs(self, verbose=False):
         configs = {}
         result_topology = {}
         
@@ -47,6 +47,11 @@ class ConfigRandomizer:
             
             result_topology.update(topology)
             
+        if verbose:
+            print("Generated Configs:")
+            for stream_id, cfg in configs.items():
+                print(f"Stream {stream_id}: {cfg}")
+            print("Resulting Topology:")
         return configs, result_topology 
                 
     def _generate_window_sizes(self, nb_active_streams):

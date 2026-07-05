@@ -5,7 +5,8 @@ module alloc_manager #(
   parameter int ADDR_WIDTH  = 32,
   parameter int MACRO_DEPTH = 256,
 
-  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS)
+  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS),
+  localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -65,7 +66,7 @@ module alloc_manager #(
         window_end[n] = handshake[n] && (window_word_cnt_q[n] == cfg_window_size_i[n] - 1);
 
         am_req_o[n]       = stream_valid_i[n] & cfg_stream_en_i[n] & is_initialized_q[n];
-        am_addr_o[n]      = ADDR_WIDTH'(macro_word_cnt_q[n]);
+        am_addr_o[n]      = ADDR_WIDTH'(macro_word_cnt_q[n]) * DATA_WIDTH_BYTES;
         am_macro_sel_o[n] = current_macro_q[n];
       end
 
@@ -81,7 +82,7 @@ module alloc_manager #(
 
         end else begin
           // Init
-          if (cfg_stream_en_i[n] && !is_initialized_q[n]) begin
+          if (cfg_stream_en_i[n] && !is_initialized_q[n] && cfg_window_size_i[n] != '0) begin
             current_macro_q[n]        <= cfg_start_macro_i[n];
             current_window_start_q[n] <= cfg_start_macro_i[n];
             macro_word_cnt_q[n]       <= '{default: '0};

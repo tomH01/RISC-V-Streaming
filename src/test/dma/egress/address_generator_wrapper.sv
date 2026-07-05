@@ -7,7 +7,7 @@ module address_generator_wrapper #(
   parameter int MACRO_DEPTH = 256,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
+  localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS)
 )(
   input logic clk_i,
@@ -41,10 +41,11 @@ module address_generator_wrapper #(
   input  logic                       bp_r_valid_i,
 
   // Bus IF
-  input logic                   bus_ready_i,
-  output logic                  bus_valid_o,
-  output logic [ADDR_WIDTH-1:0] bus_addr_o,
-  output logic [DATA_WIDTH-1:0] bus_wdata_o
+  input logic                       bus_ready_i,
+  output logic                      bus_valid_o,
+  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o,
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o,
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o
 );
 
   job_if #(
@@ -90,6 +91,7 @@ module address_generator_wrapper #(
 
     .bus_ready_i(bus_ready_i),
     .bus_valid_o(bus_valid_o),
+    .bus_bank_o(bus_bank_o),
     .bus_addr_o(bus_addr_o),
     .bus_wdata_o(bus_wdata_o)
   );

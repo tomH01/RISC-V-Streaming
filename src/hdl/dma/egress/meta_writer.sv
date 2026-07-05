@@ -16,10 +16,11 @@ module meta_writer #(
   input logic [DATA_WIDTH-1:0] l2_bank_base_i [B_BANKS],
 
   // Bus IF
-  input logic                   bus_ready_i,
-  output logic                  bus_valid_o,
-  output logic [ADDR_WIDTH-1:0] bus_addr_o,
-  output logic [DATA_WIDTH-1:0] bus_wdata_o
+  input logic                       bus_ready_i,
+  output logic                      bus_valid_o,
+  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o,
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o,
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o
 
   
 );
@@ -82,6 +83,7 @@ module meta_writer #(
     fifo_pop      = 1'b0;
 
     bus_valid_o   = 1'b0;
+    bus_bank_o    = '0;
     bus_addr_o    = '0; 
     bus_wdata_o   = '0;
 
@@ -106,6 +108,7 @@ module meta_writer #(
 
       WRITE_CLOSE_COUNT: begin
         bus_valid_o = 1'b1;
+        bus_bank_o  = closed_bank_q;
         bus_addr_o  = l2_bank_base_i[closed_bank_q];
         bus_wdata_o = bank_cnt_q[closed_bank_q];
 
@@ -119,6 +122,7 @@ module meta_writer #(
 
       WRITE_WINDOW_ID: begin
         bus_valid_o = 1'b1;
+        bus_bank_o  = pkt_q.bank_idx;
         bus_addr_o  = ADDR_WIDTH'(l2_bank_base_i[pkt_q.bank_idx] + 
                                   bank_ptr_q[pkt_q.bank_idx] * DATA_WIDTH_BYTES);
         bus_wdata_o = pkt_q.window_id;
@@ -132,6 +136,7 @@ module meta_writer #(
 
       WRITE_WINDOW_SIZE: begin
         bus_valid_o = 1'b1;
+        bus_bank_o  = pkt_q.bank_idx;
         bus_addr_o  = ADDR_WIDTH'(l2_bank_base_i[pkt_q.bank_idx] + 
                                   bank_ptr_q[pkt_q.bank_idx] * DATA_WIDTH_BYTES);
         bus_wdata_o = pkt_q.window_size;

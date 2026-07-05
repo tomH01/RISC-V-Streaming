@@ -7,12 +7,11 @@ module address_generator #(
   parameter int MACRO_DEPTH = 256,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
+  localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
   localparam int OFFSET_WIDTH     = $clog2(MACRO_DEPTH),
   localparam int MACRO_CNT_WIDTH  = $clog2(M_MACROS + 1),
   localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
-  localparam int WIDTH_SHIFT      = $clog2(DATA_WIDTH_BYTES),
   localparam int NUM_MODES        = 16
 )(
   input logic clk_i,
@@ -38,10 +37,11 @@ module address_generator #(
   input  logic                       bp_r_valid_i,
 
   // Bus IF
-  input logic                   bus_ready_i,
-  output logic                  bus_valid_o,
-  output logic [ADDR_WIDTH-1:0] bus_addr_o,
-  output logic [DATA_WIDTH-1:0] bus_wdata_o
+  input logic                       bus_ready_i,
+  output logic                      bus_valid_o,
+  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o,
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o,
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o
 );
 
   typedef enum logic [1:0] {
@@ -79,20 +79,21 @@ module address_generator #(
   logic [ADDR_WIDTH-1:0] current_addr;
   logic                  job_start; 
   logic                  can_issue_req;
-  logic                  skid_ready;
+  logic                  fifo_empty;
   logic                  pipeline_full;
 
-  assign pipeline_full     = ((req_cnt_q - bus_cnt_q) >= 2);
+  assign pipeline_full     = ((req_cnt_q - bus_cnt_q) >= 4);
   assign can_issue_req     = (state_q == RUN) && 
-                             skid_ready &&
                              !pipeline_full &&
                              (req_cnt_q < window_size_q);
 
-  assign bp_addr_o         = current_addr[OFFSET_WIDTH-1:0] << WIDTH_SHIFT;
+  assign bp_addr_o         = current_addr[OFFSET_WIDTH-1:0] * DATA_WIDTH_BYTES;
   assign bp_macro_sel_o    = macro_table_q[current_addr >> OFFSET_WIDTH];
   assign bp_req_o          = can_issue_req;
 
-  assign bus_addr_o        = base_addr_q + (bus_cnt_q << WIDTH_SHIFT);
+  assign bus_valid_o       = !fifo_empty;
+  assign bus_bank_o        = bank_idx_q;
+  assign bus_addr_o        = base_addr_q + (bus_cnt_q * DATA_WIDTH_BYTES);
 
   // AGU State Machine
   always_comb begin
@@ -213,19 +214,19 @@ module address_generator #(
     endcase
   end
 
-  skid_buffer #(
-    .DATA_WIDTH(DATA_WIDTH)
-  ) u_skid_buffer (
+  fwft_fifo #(
+    .DATA_WIDTH(DATA_WIDTH),
+    .DEPTH(4)
+  ) u_fwft_fifo (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
-    .us_valid_i(bp_r_valid_i),
-    .us_data_i(bp_r_rdata_i),
-    .us_ready_o(skid_ready),
-    .ds_ready_i(bus_ready_i),
-    .ds_valid_o(bus_valid_o),
-    .ds_data_o(bus_wdata_o)
+    .push_i(bp_r_valid_i),
+    .data_i(bp_r_rdata_i),
+    .full_o(),
+    .pop_i(bus_valid_o && bus_ready_i),
+    .data_o(bus_wdata_o),
+    .empty_o(fifo_empty)
   );
-
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -234,7 +235,7 @@ module address_generator #(
       stream_id_q      <= '0;
       start_macro_id_q <= '0;
       window_size_q    <= '0;
-      agu_mode_q       <= '0;
+      agu_mode_q       <= MODE_LINEAR;
       window_id_q      <= '0;
       payload_q        <= '0;
       base_addr_q      <= '0;

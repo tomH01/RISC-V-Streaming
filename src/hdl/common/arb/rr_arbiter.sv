@@ -17,7 +17,7 @@ module rr_arbiter #(
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-      pointer <= '0;
+      pointer <= NUM_REQS'(1);
     end else begin
       pointer <= pointer_next;
     end

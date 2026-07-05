@@ -74,7 +74,7 @@ module l2_allocator #(
 
   // Job Dispatch Logic
   logic [DATA_WIDTH-1:0] current_job_size;
-  assign current_job_size = DATA_WIDTH'(job_req_i.pkt.window_size << WIDTH_SHIFT);
+  assign current_job_size = DATA_WIDTH'(job_req_i.pkt.window_size * DATA_WIDTH_BYTES);
 
   logic fits_in_current_bank;
   assign fits_in_current_bank = (bank_offset_q + bank_header_size_b_i + current_job_size) <= bank_limit_b_i;
@@ -90,10 +90,12 @@ module l2_allocator #(
                              (~bank_busy_q[next_bank] & ~bank_owner_i[next_bank]);
 
 
+  logic job_not_empty;
   logic ready_cond;
   logic do_dispatch;
+  assign job_not_empty   = job_req_i.pkt.window_size != '0;
   assign ready_cond      = target_bank_ready && has_idle_worker && meta_req_o.ready;
-  assign do_dispatch     = job_req_i.valid && ready_cond;
+  assign do_dispatch     = job_req_i.valid && ready_cond && job_not_empty;
   assign job_req_i.ready = ready_cond;
 
   assign meta_req_o.valid           = do_dispatch;

@@ -4,7 +4,7 @@ interface job_if #(
   parameter int ADDR_WIDTH    = 32,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS)
+  localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1
 );
 
   typedef struct packed {

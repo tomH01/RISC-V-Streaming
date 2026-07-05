@@ -21,10 +21,11 @@ module meta_writer_wrapper #(
   input logic [DATA_WIDTH-1:0] l2_bank_base_i [B_BANKS],
 
   // Bus IF
-  input logic                   bus_ready_i,
-  output logic                  bus_valid_o,
-  output logic [ADDR_WIDTH-1:0] bus_addr_o,
-  output logic [DATA_WIDTH-1:0] bus_wdata_o
+  input logic                       bus_ready_i,
+  output logic                      bus_valid_o,
+  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o,
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o,
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o
 );
 
   meta_if #(
@@ -49,6 +50,7 @@ module meta_writer_wrapper #(
     // Bus IF
     .bus_ready_i(bus_ready_i),
     .bus_valid_o(bus_valid_o),
+    .bus_bank_o(bus_bank_o),
     .bus_addr_o(bus_addr_o),
     .bus_wdata_o(bus_wdata_o)
   );

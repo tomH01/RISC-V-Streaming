@@ -165,12 +165,12 @@ class NotificationMonitor:
             await RisingEdge(self.dut.clk_i)
             await ReadOnly()
 
-            if self.dut.notify_valid_o.value.integer > 0:
+            if self.dut.notif_valid_o.value.integer > 0:
                 for s in range(self.n_streams):
-                    if self.dut.notify_valid_o[s].value == 1:
+                    if self.dut.notif_valid_o[s].value == 1:
                         notif = {
                             "stream_idx": s,
-                            "macro": self.dut.notify_start_macro_o[s].value.integer,
+                            "macro": self.dut.notif_start_macro_o[s].value.integer,
                         }
                         self.scoreboard.add_actual_notification(s, notif)
     
@@ -228,7 +228,7 @@ class GoldenModel:
         
         expected_macro = state['current_macro']
         expected = {
-            "addr": state['macro_word_cnt'], 
+            "addr": state['macro_word_cnt'] * 4, 
             "wdata": data,
         }
         

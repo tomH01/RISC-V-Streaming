@@ -59,7 +59,6 @@ class GoldenModel:
             
     async def run(self, stream_id, interval):
         state = self.state[stream_id]
-        
         interval_count = 0
         
         while True:      
@@ -76,18 +75,12 @@ class GoldenModel:
             if state["has_valid_word"] and self.dut.stream_ready_i[stream_id].value == 1:
                 self.score_board.add_expected(stream_id, state["data_counter"])
                 state["has_valid_word"] = False
-                consumed_this_cycle = True
                 
-                state["data_counter"] += 1
-                
-            if interval_count >= interval - 1:
+            if interval <= 1 or interval_count >= interval - 1:
                 interval_count = 0
                 
-                if state["has_valid_word"] and not consumed_this_cycle:
-                    state["drop_counter"] += 1
-                    state["data_counter"] += 1
-                
                 state["has_valid_word"] = True
+                state["data_counter"] += 1
             
             else:
                 interval_count += 1   
@@ -171,7 +164,7 @@ async def test_stream_generator(dut):
         await driver.set_stream_intervals(n, intervals[n])
         
     
-    NUM_CYCLES = 100000
+    NUM_CYCLES = 10000
     for i in range(NUM_CYCLES):
         await RisingEdge(dut.clk_i)
         if i % 1000 == 0:

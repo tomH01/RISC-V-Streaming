@@ -6,7 +6,7 @@ module job_manager #(
   parameter int FIFO_DEPTH    = 8,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
+  localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
 
   localparam int STREAM_ID_WIDTH = 7,
   localparam int LOCAL_ID_WIDTH  = DATA_WIDTH - STREAM_ID_WIDTH
@@ -85,9 +85,8 @@ module job_manager #(
 
   generate
     for (genvar i = 0; i < N_STREAMS; i++) begin : gen_fifos
-
-      assign stream_ready_vec[i] = ~notif_empty[i];
-      assign notif_pop[i]        = stream_gnt_vec[i] & arb_valid;
+      assign stream_ready_vec[i] = ~notif_empty[i] && (window_size_i[i] != '0);
+      assign notif_pop[i]        = (stream_gnt_vec[i] & arb_valid) || (~notif_empty[i] && (window_size_i[i] == '0));
 
       fwft_fifo #(
         .DATA_WIDTH(MACRO_PTR_WIDTH),
@@ -175,22 +174,24 @@ module job_manager #(
     us_job_valid = arb_valid;
     us_job_data  = '0;
 
-    for (int i = 0; i < N_STREAMS; i++) begin
-      if (stream_gnt_vec[i] && arb_valid) begin
-        us_job_data.stream_id   = STREAM_PTR_WIDTH'(i);
-        us_job_data.start_macro = notif_data[i];
-        us_job_data.window_size = window_size_i[i];
-        us_job_data.window_id   = {
-          16'(i),
-          current_cfg_q[i].window_id
-        };
+    if (arb_valid) begin
+      for (int i = 0; i < N_STREAMS; i++) begin
+        if (stream_gnt_vec[i]) begin
+          us_job_data.stream_id   = STREAM_PTR_WIDTH'(i);
+          us_job_data.start_macro = notif_data[i];
+          us_job_data.window_size = window_size_i[i];
+          us_job_data.window_id   = {
+            16'(i),
+            current_cfg_q[i].window_id
+          };
 
-        if (effective_active[i]) begin
-          us_job_data.mode    = effective_cfg[i].mode;
-          us_job_data.payload = effective_cfg[i].payload;
-        end else begin
-          us_job_data.mode    = '0; // Linear Mode
-          us_job_data.payload = '0;
+          if (effective_active[i]) begin
+            us_job_data.mode    = effective_cfg[i].mode;
+            us_job_data.payload = effective_cfg[i].payload;
+          end else begin
+            us_job_data.mode    = '0; // Linear Mode
+            us_job_data.payload = '0;
+          end
         end
       end
     end

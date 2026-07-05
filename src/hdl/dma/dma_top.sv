@@ -1,14 +1,14 @@
 module dma_top #(
-  parameter int N_STREAMS   = 4,
-  parameter int M_MACROS    = 8,
-  parameter int DATA_WIDTH  = 32,
-  parameter int ADDR_WIDTH  = 32,
-  parameter int W_WORKERS   = 1,
-  parameter int B_BANKS     = 2,
-  parameter int MACRO_DEPTH = 256,
+  parameter int N_STREAMS           = 4,
+  parameter int M_MACROS            = 8,
+  parameter int DATA_WIDTH          = 32,
+  parameter int ADDR_WIDTH          = 32,
+  parameter int W_WORKERS           = 1,
+  parameter int B_BANKS             = 2,
+  parameter int MACRO_DEPTH         = 256,
+  parameter int STREAM_OFFSET_WIDTH = 10,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int STREAM_PTR_WIDTH = $clog2(N_STREAMS),
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
   localparam int META_WTR         = 1,
   localparam int BUS_WIDTH        = W_WORKERS + META_WTR
@@ -27,10 +27,11 @@ module dma_top #(
   output logic                  pslverr_o,
 
   // TCDM Bus IF
-  input  logic                  bus_ready_i [BUS_WIDTH],
-  output logic                  bus_valid_o [BUS_WIDTH],
-  output logic [ADDR_WIDTH-1:0] bus_addr_o  [BUS_WIDTH],
-  output logic [DATA_WIDTH-1:0] bus_wdata_o [BUS_WIDTH]
+  input  logic                      bus_ready_i [BUS_WIDTH],
+  output logic                      bus_valid_o [BUS_WIDTH],
+  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o  [BUS_WIDTH],
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [BUS_WIDTH],
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o [BUS_WIDTH]
 );
 
   // #######
@@ -103,8 +104,7 @@ module dma_top #(
   stream_generator #(
     .N_STREAMS(N_STREAMS),
     .DATA_WIDTH(DATA_WIDTH),
-    .ADDR_WIDTH(ADDR_WIDTH),
-    .STREAM_OFFSET_WIDTH(20)
+    .STREAM_OFFSET_WIDTH(STREAM_OFFSET_WIDTH)
   ) u_stream_generator (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
@@ -114,9 +114,7 @@ module dma_top #(
     .stream_ready_i(stream_ready),
 
     .stream_en_i(cfg_stream_en),
-    .stream_interval_i(cfg_stream_interval),
-
-    .stream_drop_cnt_o()
+    .stream_interval_i(cfg_stream_interval)
   );
 
 
@@ -201,7 +199,7 @@ module dma_top #(
     .l2_bank_base_i(cfg_l2_bank_base),
     .bank_limit_b_i(cfg_bank_limit_b),
     .bank_header_size_b_i(cfg_bank_header_size_b),
-    .bank_owner_i(bank_owner),
+    .bank_owner_i(cfg_bank_owner),
     .bank_full_o(egr_bank_full),
 
     .stream_en_i(cfg_stream_en),
@@ -214,6 +212,7 @@ module dma_top #(
 
     .bus_ready_i(bus_ready_i),
     .bus_valid_o(bus_valid_o),
+    .bus_bank_o(bus_bank_o),
     .bus_addr_o(bus_addr_o),
     .bus_wdata_o(bus_wdata_o)
   );
