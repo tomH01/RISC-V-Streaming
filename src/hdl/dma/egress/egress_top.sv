@@ -10,9 +10,9 @@ module egress_top #(
   localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
-  localparam int META_WTR     = 1,
-  localparam int BUS_WIDTH        = W_WORKERS + META_WTR,
-  localparam int META_WRT_BUS_IDX = BUS_WIDTH - META_WTR
+  localparam int META_MASTER      = 1,
+  localparam int NUM_MASTERS      = W_WORKERS + META_MASTER,
+  localparam int META_WRT_BUS_IDX = NUM_MASTERS - META_MASTER
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -47,11 +47,11 @@ module egress_top #(
   input logic [4*DATA_WIDTH-1:0] cfg_wdata_i [N_STREAMS],
 
   // Bus IF
-  input  logic                      bus_ready_i [BUS_WIDTH],
-  output logic                      bus_valid_o [BUS_WIDTH],
-  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o  [BUS_WIDTH],
-  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [BUS_WIDTH],
-  output logic [DATA_WIDTH-1:0]     bus_wdata_o [BUS_WIDTH]
+  input  logic [NUM_MASTERS-1:0]    bus_ready_i,
+  output logic [NUM_MASTERS-1:0]    bus_valid_o,
+  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o  [NUM_MASTERS],
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [NUM_MASTERS],
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o [NUM_MASTERS]
 );
 
   // ############

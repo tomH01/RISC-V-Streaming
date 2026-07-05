@@ -10,8 +10,8 @@ module dma_top #(
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
-  localparam int META_WTR         = 1,
-  localparam int BUS_WIDTH        = W_WORKERS + META_WTR
+  localparam int META_MASTER      = 1,
+  localparam int NUM_MASTERS      = W_WORKERS + META_MASTER
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -27,11 +27,11 @@ module dma_top #(
   output logic                  pslverr_o,
 
   // TCDM Bus IF
-  input  logic                      bus_ready_i [BUS_WIDTH],
-  output logic                      bus_valid_o [BUS_WIDTH],
-  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o  [BUS_WIDTH],
-  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [BUS_WIDTH],
-  output logic [DATA_WIDTH-1:0]     bus_wdata_o [BUS_WIDTH]
+  input  logic [NUM_MASTERS-1:0]    bus_ready_i,
+  output logic [NUM_MASTERS-1:0]    bus_valid_o,
+  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o  [NUM_MASTERS],
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [NUM_MASTERS],
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o [NUM_MASTERS]
 );
 
   // #######

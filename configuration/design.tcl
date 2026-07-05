@@ -39,14 +39,27 @@ set egress_hdl [list \
   "src/hdl/dma/egress/egress_top.sv" \
 ]
 
-set dma_hdl [list \
+set dma_hdl [concat \
+  $ingress_hdl \
+  $egress_hdl \
+  [list \
+    "src/hdl/memory/buffer_sram_macro.sv" \
     "src/hdl/dma/buffer_pool.sv" \
     "src/hdl/dma/control.sv" \
     "src/hdl/dma/stream_generator.sv" \
     "src/hdl/dma/dma_top.sv" \
+  ] 
 ]
 
-
+set xbar [list \
+  "src/hdl/common/interconnect/cc_lzc.sv" \
+  "src/hdl/common/interconnect/cc_pkg.sv" \
+  "src/hdl/common/interconnect/cc_rr_arb_tree.sv" \
+  "src/hdl/common/interconnect/cc_spill_register.sv" \
+  "src/hdl/common/interconnect/cc_spill_register_flushable.sv" \
+  "src/hdl/common/interconnect/cc_stream_demux.sv" \
+  "src/hdl/common/interconnect/cc_stream_xbar.sv" \
+]
 
 # ------
 # Common
@@ -239,11 +252,8 @@ $control addPythonSimFiles [concat $global_sim_files $tools [list \
 
 set dma_top [EDA::Design::createComponent dma_top]
 
-$dma_top addHDLSourceFiles [concat \
-  $ingress_hdl \
-  $egress_hdl \
-  $dma_hdl \
-]
+$dma_top addHDLSourceFiles $dma_hdl 
+
 
 $dma_top addPythonSimFiles [concat $global_sim_files $tools [list \
   "src/test/dma/test_dma_top.py" \
@@ -271,6 +281,33 @@ $stream_generator addHDLSourceFiles [list \
 $stream_generator addPythonSimFiles [concat $global_sim_files [list \
   "src/test/dma/test_stream_generator.py" \
 ]]
+
+
+
+# ---
+# top
+# ---
+
+set top [EDA::Design::createComponent top]
+
+$top addHDLSourceFiles [concat \
+  $xbar \
+  $dma_hdl \
+  [list \
+    "src/hdl/memory/l2_sram_macro.sv" \
+    "src/hdl/top/sram_interconnect.sv" \
+    "src/hdl/top/top.sv" \
+  ]
+]
+
+$top addHDLIncludeDirectories [list \
+  "src/hdl/include" \
+]
+
+$top addPythonSimFiles [concat $global_sim_files $tools [list \
+  "src/test/top/test_top.py" \
+]]
+
 
 
 # memory_macro
