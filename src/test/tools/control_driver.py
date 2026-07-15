@@ -10,15 +10,13 @@ params = get_design_parameters()
 
 class ControlDriver:
     
-    GLOBAL_BASE = 0x0000
-    STREAM_BASE = 0x1000
-    TOPOLOGY_BASE = 0x2000
-    INTERVAL_BASE = 0x3000
+    GLOBAL_BASE = 0x08000000
+    STREAM_BASE = 0x08001000
+    TOPOLOGY_BASE = 0x08002000
+    INTERVAL_BASE = 0x08003000
     
     GLOBAL_CONTROL = 0x00
     BANK_LIMIT_B = 0x04
-    BANK_HEADER_SIZE_B = 0x08
-    RELEASE_BANK = 0x0C
     BANK_BASE_OFFSET = 0x20    
     
     STREAM_STRIDE = 0x20
@@ -40,9 +38,6 @@ class ControlDriver:
         
         self.apb = APBDriver(dut)  
         
-    def init_unit_signals(self):
-        self.dut.bank_full_i.value = 0
-        
     async def reset(self):
         self.dut.rst_ni.value = 0
         await RisingEdge(self.dut.clk_i)
@@ -59,11 +54,6 @@ class ControlDriver:
                 addr = self.GLOBAL_BASE + self.GLOBAL_CONTROL
             case "bank_limit_b":
                 addr = self.GLOBAL_BASE + self.BANK_LIMIT_B
-            case "bank_header_size_b":
-                addr = self.GLOBAL_BASE + self.BANK_HEADER_SIZE_B
-            case "release_bank":
-                print(f"Sending release_bank config with data: {data}")
-                addr = self.GLOBAL_BASE + self.RELEASE_BANK
             case "bank_base":
                 addr = self.GLOBAL_BASE + self.BANK_BASE_OFFSET + bank_idx * 0x4
             case _:
@@ -108,8 +98,7 @@ class ControlDriver:
         
         await self.apb.apb_write(addr, packed_data)
         
-    def get_global_control(self, dma_enable, start_bank_idx):
+    def get_global_control(self, dma_enable):
         dma_bit = (int(dma_enable) & 0x1) << 31
-        bank_idx_bits = int(start_bank_idx)
-        return dma_bit | bank_idx_bits        
+        return dma_bit        
     

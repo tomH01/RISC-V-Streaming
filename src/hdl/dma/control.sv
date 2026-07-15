@@ -24,11 +24,8 @@ module control #(
 
   // Global Control IF
   output logic                      dma_enable_o,
-  output logic [BANK_PTR_WIDTH-1:0] start_bank_idx_o,
   output logic [DATA_WIDTH-1:0]     l2_bank_base_o [B_BANKS],
   output logic [DATA_WIDTH-1:0]     bank_limit_b_o,
-  output logic [DATA_WIDTH-1:0]     bank_header_size_b_o,
-  output logic [B_BANKS-1:0]        bank_owner_o,
 
   // Ingress IF
   output logic [N_STREAMS-1:0]       stream_en_o,
@@ -36,7 +33,6 @@ module control #(
   output logic [MACRO_PTR_WIDTH-1:0] start_macro_o     [N_STREAMS],
 
   // Egress IF
-  input logic  [B_BANKS-1:0]      bank_full_i,
   output logic [N_STREAMS-1:0]    cfg_push_o,
   output logic [4*DATA_WIDTH-1:0] cfg_wdata_o [N_STREAMS],
 
@@ -46,17 +42,18 @@ module control #(
   // Stream Generator IF
   output logic [DATA_WIDTH-1:0] stream_interval_o [N_STREAMS]
 );
+  logic        is_apb_space;
+  assign is_apb_space = (paddr_i[27] == 1'b1);
 
   logic wr_en;
-  assign pready_o = psel_i & penable_i;
-  assign wr_en = pready_o & pwrite_i;
+  assign pready_o  = is_apb_space & psel_i & penable_i;
+  assign wr_en     = pready_o & pwrite_i;
+  assign prdata_o  = '0;
   assign pslverr_o = 1'b0;
 
   logic [DATA_WIDTH-1:0] global_ctrl_q;
   logic [DATA_WIDTH-1:0] l2_bank_base_q [B_BANKS];
   logic [DATA_WIDTH-1:0] bank_limit_b_q;
-  logic [DATA_WIDTH-1:0] bank_header_size_b_q;
-  logic [B_BANKS-1:0]    bank_owner_q;
 
   logic [MACRO_PTR_WIDTH-1:0] start_macro_q     [N_STREAMS];
   logic [DATA_WIDTH-1:0]      window_size_q     [N_STREAMS];
@@ -71,16 +68,16 @@ module control #(
 
   logic [DATA_WIDTH-1:0] stream_interval_q [N_STREAMS];
 
-  // 0x0000 - 0x0FFF: Global Configuration
-  // 0x1000 - 0x1FFF: Stream Configurations
-  // 0x2000 - 0x2FFF: Topology Configuration
-  // 0x3000 - 0x3FFF: Stream Interval Configuration
+  // 0x08000000 - 0x08000FFF: Global Configuration
+  // 0x08001000 - 0x08001FFF: Stream Configurations
+  // 0x08002000 - 0x08002FFF: Topology Configuration
+  // 0x08003000 - 0x08003FFF: Stream Interval Configuration
   logic is_global_cfg, is_stream_cfg, 
         is_topology, is_stream_interval, is_bank_base;
-  assign is_global_cfg      = (paddr_i[31:12] == 20'h000);
-  assign is_stream_cfg      = (paddr_i[31:12] == 20'h001);
-  assign is_topology        = (paddr_i[31:12] == 20'h002);
-  assign is_stream_interval = (paddr_i[31:12] == 20'h003);
+  assign is_global_cfg      = (paddr_i[15:12] == 4'h0);
+  assign is_stream_cfg      = (paddr_i[15:12] == 4'h1);
+  assign is_topology        = (paddr_i[15:12] == 4'h2);
+  assign is_stream_interval = (paddr_i[15:12] == 4'h3);
   assign is_bank_base       = is_global_cfg && (paddr_i[11:5] == 7'd1);
 
   logic [11:0] global_offset; 
@@ -102,8 +99,6 @@ module control #(
       global_ctrl_q        <= '0;
       l2_bank_base_q       <= '{default: '0};
       bank_limit_b_q       <= '0;
-      bank_header_size_b_q <= '0; 
-      bank_owner_q         <= '0;
 
       start_macro_q     <= '{default: '0};
       window_size_q     <= '{default: '0};
@@ -120,17 +115,12 @@ module control #(
     end else begin
       cfg_push_q <= '{default: 1'b0}; 
 
-      // CPU owns bank if full
-      bank_owner_q <= bank_owner_q | bank_full_i; 
-
-      if (wr_en) begin
+      if (wr_en && is_apb_space) begin
         // Global Configuration
         if (is_global_cfg) begin
           case (global_offset)
             12'h00: global_ctrl_q        <= pwdata_i;
             12'h04: bank_limit_b_q       <= pwdata_i;
-            12'h08: bank_header_size_b_q <= pwdata_i;
-            12'h0C: bank_owner_q         <= (bank_owner_q | bank_full_i) & ~pwdata_i[B_BANKS-1:0]; 
             default: begin
               if (is_bank_base && (bank_idx < B_BANKS)) begin
                 l2_bank_base_q[bank_idx] <= pwdata_i;
@@ -177,11 +167,8 @@ module control #(
   end
 
   assign dma_enable_o         = global_ctrl_q[31];
-  assign start_bank_idx_o     = global_ctrl_q[BANK_PTR_WIDTH-1:0];
   assign l2_bank_base_o       = l2_bank_base_q;
   assign bank_limit_b_o       = bank_limit_b_q;
-  assign bank_header_size_b_o = bank_header_size_b_q;
-  assign bank_owner_o         = bank_owner_q;
 
   assign stream_en_o   = stream_en_q;
   assign start_macro_o = start_macro_q;
