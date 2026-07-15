@@ -12,60 +12,91 @@
 
 `define SYNOPSYS_MACRO_PRI0 sadclssd4LOW1p32768x32m16b8w1c0p1d0l0rm3sdrw01_wrapper
 
-// Private bank 0
 
-module l2_sram_macro #() (
+module l2_sram_macro #(
+  parameter     MACRO_TYPE = "SYNOPSYS",
+  parameter int B_BANKS    = 4,
+
+  localparam int BANK_PTR_WIDTH  = (B_BANKS > 1) ? $clog2(B_BANKS) : 1,
+  localparam int BANK_ADDR_WIDTH = $clog2(`MACRO_SIZE_PRI0)
+)(
     input logic clk_i,
     input logic rst_ni,
-    // ################################
+
     // Bus Interface - REQUEST CHANNEL
-    input logic          req,
-    input logic [31:0]   add,
-    input logic          wen,
-    input logic [31:0]   wdata,
-    input logic [3:0]    be,
-    output logic         gnt,
-    // ################################
+    input  logic [B_BANKS-1:0] req_i,
+    input  logic [31:0]        addr_i  [B_BANKS],
+    input  logic [B_BANKS-1:0] wen_i,
+    input  logic [31:0]        wdata_i [B_BANKS],
+    input  logic [3:0]         be_i    [B_BANKS],
+    output logic [B_BANKS-1:0] gnt_o,
+
     // Bus Interface - RESPONSE CHANNEL
-    output logic [31:0]  r_rdata,
-    output logic         r_valid
+    output logic [31:0]        r_rdata_o [B_BANKS],
+    output logic [B_BANKS-1:0] r_valid_o
 );
 
-  localparam int unsigned PRI0_MEM_ADDR_WIDTH = $clog2(`MACRO_SIZE_PRI0);
+  logic [31:0] BE_BW_BANK [B_BANKS];
 
-  // TCDM handshaking for constant 1 cycle latency
-  assign gnt   = req;
+  generate
+    for (genvar i = 0; i < B_BANKS; i++) begin : gen_parallel_banks
+      // TCDM handshaking for constant 1 cycle latency
+      assign gnt_o[i] = req_i[i];
 
-  always_ff @(posedge clk_i, negedge rst_ni) begin
-    if (!rst_ni) begin
-      r_valid <= 1'b0;
-    end else begin
-      r_valid <= req;
+      always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin 
+          r_valid_o[i] <= 1'b0;
+        end else begin
+          r_valid_o[i] <= req_i[i] && wen_i[i];
+        end
+      end
+
+      logic [BANK_ADDR_WIDTH-1:0] internal_bank_addr;
+
+      if (B_BANKS > 1) begin : gen_multi_addr_slice
+        assign internal_bank_addr = addr_i[i][BANK_PTR_WIDTH+BANK_ADDR_WIDTH+2-1:2+BANK_PTR_WIDTH];
+      end else begin : gen_single_addr_slice
+        assign internal_bank_addr = addr_i[i][BANK_ADDR_WIDTH+2-1:2];
+      end
+
+      assign BE_BW_BANK[i] = {
+        {8{be_i[i][3]}},
+        {8{be_i[i][2]}},
+        {8{be_i[i][1]}},
+        {8{be_i[i][0]}}
+      };
+
+      if (MACRO_TYPE == "SYNOPSYS") begin : gen_asic_bank
+        `SYNOPSYS_MACRO_PRI0 bank_sram_pri0_i (
+            .Q  (r_rdata_o[i]),
+            .ADR(internal_bank_addr),
+            .D  (wdata_i[i]),
+            .WEM(BE_BW_BANK[i]),
+            .WE (~wen_i[i]),
+            .ME (req_i[i]),
+            .CLK(clk_i),
+            .LS(1'b0),
+            .DS(1'b0),
+            .SD(1'b0)
+        );
+      end else begin : gen_rtl_bank
+        tc_sram #(
+          .NumWords(`MACRO_SIZE_PRI0),
+          .WordWidth(32),
+          .NumPorts(1)
+        ) u_bank (
+          .clk_i(clk_i),
+          .rst_ni(rst_ni),
+          .req_i(req_i[i]),
+          .we_i(~wen_i[i]),
+          .addr_i(internal_bank_addr),
+          .wdata_i(wdata_i[i]),
+          .be_i(be_i[i]),
+          .rdata_o(r_rdata_o[i])
+        );
+      end
+
     end
-  end
-
-  logic [31:0] pri0_address;
-  assign pri0_address = add;
-
-  logic [31:0] BE_BW_BANK;
-  assign BE_BW_BANK = {
-      {8{be[3]}},
-      {8{be[2]}},
-      {8{be[1]}},
-      {8{be[0]}}
-  };
-
-  `SYNOPSYS_MACRO_PRI0 bank_sram_pri0_i (
-      .Q  (r_rdata),
-      .ADR(pri0_address[PRI0_MEM_ADDR_WIDTH+2-1:2]),
-      .D  (wdata),
-      .WEM(BE_BW_BANK),
-      .WE (~wen),
-      .ME (req),
-      .CLK(clk_i),
-      .LS(1'b0),
-      .DS(1'b0),
-      .SD(1'b0)
-  );
+  endgenerate
 
 endmodule
