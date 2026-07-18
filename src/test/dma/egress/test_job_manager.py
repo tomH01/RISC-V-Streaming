@@ -127,7 +127,6 @@ class GoldenModel:
                     'start_macro': start_macro,
                     'window_size': st['window_size'],
                     'mode': st['current_cfg']['mode'] if (st['current_cfg'] and is_active) else 0,
-                    'window_id': (grant_id << 16) | st['current_window_id'],
                     'payload': st['current_cfg']['payload'] if (st['current_cfg'] and is_active) else 0
                 }
                 
@@ -166,7 +165,6 @@ class OutputMonitor:
                     'start_macro': int(self.dut.job_start_macro_o.value),
                     'window_size': int(self.dut.job_window_size_o.value),
                     'mode': int(self.dut.job_mode_o.value),
-                    'window_id': int(self.dut.job_window_id_o.value),
                     'payload': int(self.dut.job_payload_o.value),
                 }
                 self.score_board.add_actual(result)
@@ -191,7 +189,6 @@ class Scoreboard:
             assert exp['stream_id'] == act['stream_id'], f"Stream ID mismatch: expected {exp['stream_id']}, got {act['stream_id']}"
             assert exp['start_macro'] == act['start_macro'], f"Start Macro mismatch: expected {exp['start_macro']}, got {act['start_macro']}"
             assert exp['window_size'] == act['window_size'], f"Window Size mismatch: expected {exp['window_size']}, got {act['window_size']}"
-            assert exp['window_id'] == act['window_id'], f"Window ID mismatch: expected {exp['window_id']}, got {act['window_id']}"
             assert exp['mode'] == act['mode'], f"Mode mismatch: expected {exp['mode']}, got {act['mode']}"  
             assert exp['payload'] == act['payload'], f"Payload mismatch: expected {exp['payload']}, got {act['payload']}"   
             

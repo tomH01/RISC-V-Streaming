@@ -24,7 +24,6 @@ class TopDriver:
         self.n_streams = int(params["N_STREAMS"])
         self.w_workers = int(params["W_WORKERS"])
         self.m_macros = int(params["M_MACROS"])
-        self.cpu_masters = int(params["CPU_MASTERS"])
         
         self.ctrl_driver = ControlDriver(dut)
         
@@ -32,8 +31,7 @@ class TopDriver:
         
     def _init_signals(self):
         self.dut.cpu_valid_i.value = 0
-        for c in range(self.cpu_masters):
-            self.dut.cpu_addr_i[c].value = 0
+        self.dut.cpu_addr_i.value = 0
         
     async def reset(self):
         self.dut.rst_ni.value = 0
@@ -48,11 +46,10 @@ class TopDriver:
         for stream_id, cfg in configs.items():
             await self._send_stream_cfg(stream_id, cfg)
             
-    async def setup_global_cfg(self, bank_limit, bank_header_size, bank_bases):
-        await self.ctrl_driver.send_global_config("bank_limit_b", bank_limit)
-        await self.ctrl_driver.send_global_config("bank_header_size_b", bank_header_size)
-        for bank_idx, base in enumerate(bank_bases):
-            await self.ctrl_driver.send_global_config("bank_base", base, bank_idx)   
+    async def setup_global_cfg(self, bank_base):
+        await self.ctrl_driver.send_global_config("bank_base", bank_base)
+        await RisingEdge(self.dut.clk_i)
+        await self.ctrl_driver.send_global_config("egress_enable", self.ctrl_driver.get_enable(True))   
             
     async def activate_streams(self, configs):
         for stream_id in configs.keys():
@@ -64,8 +61,8 @@ class TopDriver:
         
     async def _send_stream_cfg(self, stream_id, cfg):
         await self.ctrl_driver.send_ingress_config("start_macro", cfg["start_macro"], stream_id)
-        await self.ctrl_driver.send_ingress_config("window_size", 10, stream_id)#cfg["window_size"], stream_id)
-        await self.ctrl_driver.send_stream_interval(stream_id, 3)#cfg["interval"])
+        await self.ctrl_driver.send_ingress_config("window_size", 200, stream_id)#cfg["window_size"], stream_id)
+        await self.ctrl_driver.send_stream_interval(stream_id, 1)#cfg["interval"])
         
     async def _send_topology_cfg(self, topology):
         for i in range(0, self.m_macros, 2):
@@ -95,10 +92,8 @@ async def test_dma_top(dut):
         
         await driver.setup_ingress_cfg(configs, topology)        
         
-        bank_limit = 1024
-        bank_header_size = 128
-        bank_bases = [0, 0]
-        await driver.setup_global_cfg(bank_limit, bank_header_size, bank_bases)
+        bank_base = 0
+        await driver.setup_global_cfg(bank_base)
         
         await driver.activate_streams(configs)
         

@@ -5,8 +5,8 @@ module l2_subsystem #(
   parameter int B_BANKS             = 2,
   parameter int BANK_DEPTH          = 16384,
 
-  localparam int DATA_WIDTH_BYTES   = DATA_WIDTH / 8,
-  localparam int DMA_MANAGERS       = W_WORKERS
+  localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
+  localparam int DMA_MANAGERS     = W_WORKERS
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -19,12 +19,19 @@ module l2_subsystem #(
   output logic                    cpu_ready_o,
   input  logic                    cpu_valid_i,
   input  logic [ADDR_WIDTH-1:0]   cpu_addr_i,
+  input  logic [DATA_WIDTH-1:0]   cpu_wdata_i,
+  input  logic                    cpu_wen_i,
+
   output logic [DATA_WIDTH-1:0]   cpu_r_rdata_o,
   output logic                    cpu_r_valid_o,
 
-  output logic                  meta_req_o,
-  output logic [ADDR_WIDTH-1:0] meta_addr_o,
-  input  logic                  meta_gnt_i,
+  output logic                        meta_req_o,
+  output logic [ADDR_WIDTH-1:0]       meta_addr_o,
+  input  logic                        meta_gnt_i,
+  output logic                        meta_wen_o,
+  output logic [DATA_WIDTH-1:0]       meta_wdata_o,
+  output logic [DATA_WIDTH_BYTES-1:0] meta_be_o,
+
   input  logic [DATA_WIDTH-1:0] meta_r_rdata_i,
   input  logic                  meta_r_valid_i
 );
@@ -42,8 +49,7 @@ module l2_subsystem #(
 
   logic [DMA_MANAGERS-1:0]     dma_wen_static;
   logic [DATA_WIDTH_BYTES-1:0] dma_be_static    [DMA_MANAGERS];
-  logic                        cpu_wen_static;
-  logic [DATA_WIDTH-1:0]       cpu_wdata_static;
+
   logic [DATA_WIDTH_BYTES-1:0] cpu_be_static;
 
 
@@ -52,8 +58,6 @@ module l2_subsystem #(
     dma_wen_static    = '0;
     dma_be_static     = '{default: '1};
     
-    cpu_wen_static    = '1;
-    cpu_wdata_static  = '0;
     cpu_be_static     = '1;
   end
 
@@ -79,8 +83,8 @@ module l2_subsystem #(
     .cpu_ready_o(cpu_ready_o),
     .cpu_valid_i(cpu_valid_i),
     .cpu_addr_i(cpu_addr_i),
-    .cpu_wen_i(cpu_wen_static),
-    .cpu_wdata_i(cpu_wdata_static),
+    .cpu_wen_i(cpu_wen_i),
+    .cpu_wdata_i(cpu_wdata_i),
     .cpu_be_i(cpu_be_static),
 
     .cpu_r_rdata_o(cpu_r_rdata_o),
@@ -97,9 +101,9 @@ module l2_subsystem #(
 
     .meta_req_o(meta_req_o),
     .meta_addr_o(meta_addr_o),
-    .meta_wen_o(meta_wen_o  ),
-    .meta_wdata_o(),
-    .meta_be_o(),
+    .meta_wen_o(meta_wen_o),
+    .meta_wdata_o(meta_wdata_o),
+    .meta_be_o(meta_be_o),
     .meta_gnt_i(meta_gnt_i),
     .meta_r_rdata_i(meta_r_rdata_i),
     .meta_r_valid_i(meta_r_valid_i)

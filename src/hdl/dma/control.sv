@@ -23,9 +23,9 @@ module control #(
   output logic 					        pslverr_o,
 
   // Global Control IF
-  output logic                      dma_enable_o,
-  output logic [DATA_WIDTH-1:0]     l2_bank_base_o [B_BANKS],
-  output logic [DATA_WIDTH-1:0]     bank_limit_b_o,
+  output logic                  dma_enable_o,
+  output logic                  egress_enable_o,
+  output logic [DATA_WIDTH-1:0] l2_bank_base_o,
 
   // Ingress IF
   output logic [N_STREAMS-1:0]       stream_en_o,
@@ -42,7 +42,7 @@ module control #(
   // Stream Generator IF
   output logic [DATA_WIDTH-1:0] stream_interval_o [N_STREAMS]
 );
-  logic        is_apb_space;
+  logic  is_apb_space;
   assign is_apb_space = (paddr_i[27] == 1'b1);
 
   logic wr_en;
@@ -52,8 +52,8 @@ module control #(
   assign pslverr_o = 1'b0;
 
   logic [DATA_WIDTH-1:0] global_ctrl_q;
-  logic [DATA_WIDTH-1:0] l2_bank_base_q [B_BANKS];
-  logic [DATA_WIDTH-1:0] bank_limit_b_q;
+  logic [DATA_WIDTH-1:0] egress_enable_q;
+  logic [DATA_WIDTH-1:0] l2_bank_base_q;
 
   logic [MACRO_PTR_WIDTH-1:0] start_macro_q     [N_STREAMS];
   logic [DATA_WIDTH-1:0]      window_size_q     [N_STREAMS];
@@ -72,13 +72,11 @@ module control #(
   // 0x08001000 - 0x08001FFF: Stream Configurations
   // 0x08002000 - 0x08002FFF: Topology Configuration
   // 0x08003000 - 0x08003FFF: Stream Interval Configuration
-  logic is_global_cfg, is_stream_cfg, 
-        is_topology, is_stream_interval, is_bank_base;
+  logic is_global_cfg, is_stream_cfg, is_topology, is_stream_interval;
   assign is_global_cfg      = (paddr_i[15:12] == 4'h0);
   assign is_stream_cfg      = (paddr_i[15:12] == 4'h1);
   assign is_topology        = (paddr_i[15:12] == 4'h2);
   assign is_stream_interval = (paddr_i[15:12] == 4'h3);
-  assign is_bank_base       = is_global_cfg && (paddr_i[11:5] == 7'd1);
 
   logic [11:0] global_offset; 
   logic [6:0]  stream_idx;
@@ -91,14 +89,11 @@ module control #(
   assign topology_word_idx = paddr_i[11:2];
   assign interval_word_idx = paddr_i[11:2];
 
-  logic [BANK_PTR_WIDTH-1:0] bank_idx;
-  assign bank_idx = BANK_PTR_WIDTH'((global_offset - 12'h20) >> 2);
-
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-      global_ctrl_q        <= '0;
-      l2_bank_base_q       <= '{default: '0};
-      bank_limit_b_q       <= '0;
+      global_ctrl_q         <= '0;
+      egress_enable_q       <= '0;
+      l2_bank_base_q        <= '0;
 
       start_macro_q     <= '{default: '0};
       window_size_q     <= '{default: '0};
@@ -119,13 +114,10 @@ module control #(
         // Global Configuration
         if (is_global_cfg) begin
           case (global_offset)
-            12'h00: global_ctrl_q        <= pwdata_i;
-            12'h04: bank_limit_b_q       <= pwdata_i;
-            default: begin
-              if (is_bank_base && (bank_idx < B_BANKS)) begin
-                l2_bank_base_q[bank_idx] <= pwdata_i;
-              end
-            end
+            12'h00: global_ctrl_q         <= pwdata_i;
+            12'h04: egress_enable_q       <= pwdata_i;
+            12'h08: l2_bank_base_q        <= pwdata_i;
+            default: ;
           endcase
         end
 
@@ -166,9 +158,9 @@ module control #(
     end
   end
 
-  assign dma_enable_o         = global_ctrl_q[31];
-  assign l2_bank_base_o       = l2_bank_base_q;
-  assign bank_limit_b_o       = bank_limit_b_q;
+  assign dma_enable_o    = global_ctrl_q[31];
+  assign egress_enable_o = egress_enable_q[31];
+  assign l2_bank_base_o  = l2_bank_base_q;
 
   assign stream_en_o   = stream_en_q;
   assign start_macro_o = start_macro_q;

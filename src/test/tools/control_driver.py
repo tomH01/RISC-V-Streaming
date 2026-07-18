@@ -16,8 +16,8 @@ class ControlDriver:
     INTERVAL_BASE = 0x08003000
     
     GLOBAL_CONTROL = 0x00
-    BANK_LIMIT_B = 0x04
-    BANK_BASE_OFFSET = 0x20    
+    EGRESS_ENABLE = 0x04
+    BANK_BASE = 0x08  
     
     STREAM_STRIDE = 0x20
     
@@ -45,17 +45,14 @@ class ControlDriver:
         self.dut.rst_ni.value = 1
         await RisingEdge(self.dut.clk_i)
         
-    async def send_global_config(self, config_type, data, bank_idx=None):
-        if config_type == "bank_base" and bank_idx is None:
-            raise ValueError("bank_idx must be provided for bank_base config")
-        
+    async def send_global_config(self, config_type, data):       
         match config_type:
             case "global_ctrl":
                 addr = self.GLOBAL_BASE + self.GLOBAL_CONTROL
-            case "bank_limit_b":
-                addr = self.GLOBAL_BASE + self.BANK_LIMIT_B
             case "bank_base":
-                addr = self.GLOBAL_BASE + self.BANK_BASE_OFFSET + bank_idx * 0x4
+                addr = self.GLOBAL_BASE + self.BANK_BASE
+            case "egress_enable":
+                addr = self.GLOBAL_BASE + self.EGRESS_ENABLE
             case _:
                 raise ValueError(f"Unknown config type: {config_type}")
                 
@@ -98,7 +95,7 @@ class ControlDriver:
         
         await self.apb.apb_write(addr, packed_data)
         
-    def get_global_control(self, dma_enable):
-        dma_bit = (int(dma_enable) & 0x1) << 31
-        return dma_bit        
+    def get_enable(self, enable):
+        enable_bit = (int(enable) & 0x1) << 31
+        return enable_bit
     

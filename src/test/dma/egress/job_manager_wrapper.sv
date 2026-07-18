@@ -35,7 +35,6 @@ module job_manager_wrapper #(
   output logic [MACRO_PTR_WIDTH-1:0]  job_start_macro_o,
   output logic [ADDR_WIDTH-1:0]       job_window_size_o, 
   output logic [3:0]                  job_mode_o,
-  output logic [31:0]                 job_window_id_o,
   output logic [95:0]                 job_payload_o
 );
 
@@ -79,7 +78,6 @@ module job_manager_wrapper #(
   assign job_start_macro_o  = u_job_req_if.pkt.start_macro;
   assign job_window_size_o  = u_job_req_if.pkt.window_size; 
   assign job_mode_o         = u_job_req_if.pkt.mode;
-  assign job_window_id_o    = u_job_req_if.pkt.window_id;
   assign job_payload_o      = u_job_req_if.pkt.payload;
 
 endmodule

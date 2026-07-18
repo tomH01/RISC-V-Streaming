@@ -17,15 +17,19 @@ module address_generator #(
   input logic clk_i,
   input logic rst_ni,
 
+  // Control IF
+  input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
+
   // Allocator IF
   input logic                      sel_i,
   job_if.rx_push                   job_assign_i,
   input logic [ADDR_WIDTH-1:0]     job_addr_i,
-  input logic [BANK_PTR_WIDTH-1:0] job_bank_i,
   output logic                     job_done_o,
 
-  // Control IF
-  input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
+  // Meta IF
+  output logic                        ptr_valid_o,
+  output logic [STREAM_PTR_WIDTH-1:0] ptr_stream_id_o,
+  output logic [ADDR_WIDTH-1:0]       ptr_o,
 
   // Buffer Pool IF
   output logic [M_MACROS-1:0]        bp_release_o,
@@ -39,7 +43,6 @@ module address_generator #(
   // Bus IF
   input logic                       bus_ready_i,
   output logic                      bus_valid_o,
-  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o,
   output logic [ADDR_WIDTH-1:0]     bus_addr_o,
   output logic [DATA_WIDTH-1:0]     bus_wdata_o
 );
@@ -62,10 +65,8 @@ module address_generator #(
   logic [MACRO_PTR_WIDTH-1:0]  start_macro_id_q, start_macro_id_d;
   logic [ADDR_WIDTH-1:0]       window_size_q,    window_size_d;
   agu_mode_e                   agu_mode_q,       agu_mode_d;
-  logic [DATA_WIDTH-1:0]       window_id_q,      window_id_d;
   logic [95:0]                 payload_q,        payload_d;
   logic [ADDR_WIDTH-1:0]       base_addr_q,      base_addr_d;
-  logic [BANK_PTR_WIDTH-1:0]   bank_idx_q,       bank_idx_d;
 
   logic [ADDR_WIDTH-1:0]      req_cnt_q,      req_cnt_d;
   logic [ADDR_WIDTH-1:0]      bus_cnt_q,      bus_cnt_d;
@@ -92,8 +93,24 @@ module address_generator #(
   assign bp_req_o          = can_issue_req;
 
   assign bus_valid_o       = !fifo_empty;
-  assign bus_bank_o        = bank_idx_q;
   assign bus_addr_o        = base_addr_q + (bus_cnt_q * DATA_WIDTH_BYTES);
+
+  // Meta IF
+  always_comb begin
+    ptr_valid_o       = 1'b0;
+    ptr_stream_id_o   = '0;
+    ptr_o             = '0;
+
+    if (state_q != IDLE) begin
+      ptr_valid_o     = 1'b1;
+      ptr_stream_id_o = stream_id_q;
+      ptr_o           = base_addr_q + (bus_cnt_q * DATA_WIDTH_BYTES);
+    end else if (sel_i && job_assign_i.valid) begin
+      ptr_valid_o     = 1'b1;
+      ptr_stream_id_o = job_assign_i.pkt.stream_id;
+      ptr_o           = job_addr_i;
+    end
+  end
 
   // AGU State Machine
   always_comb begin
@@ -109,10 +126,8 @@ module address_generator #(
     start_macro_id_d = start_macro_id_q;
     window_size_d    = window_size_q;
     agu_mode_d       = agu_mode_q;
-    window_id_d      = window_id_q;
     payload_d        = payload_q;
     base_addr_d      = base_addr_q;
-    bank_idx_d       = bank_idx_q;
 
     job_start  = 1'b0;
     job_done_o = 1'b0;
@@ -135,10 +150,8 @@ module address_generator #(
           start_macro_id_d = job_assign_i.pkt.start_macro;
           window_size_d    = job_assign_i.pkt.window_size;
           agu_mode_d       = agu_mode_e'(job_assign_i.pkt.mode);
-          window_id_d      = job_assign_i.pkt.window_id;
           payload_d        = job_assign_i.pkt.payload;
           base_addr_d      = job_addr_i;
-          bank_idx_d       = job_bank_i;
 
           state_d = PREPARE;
         end
@@ -236,10 +249,8 @@ module address_generator #(
       start_macro_id_q <= '0;
       window_size_q    <= '0;
       agu_mode_q       <= MODE_LINEAR;
-      window_id_q      <= '0;
       payload_q        <= '0;
       base_addr_q      <= '0;
-      bank_idx_q       <= '0;
 
       req_cnt_q           <= '0;
       bus_cnt_q           <= '0;
@@ -255,10 +266,8 @@ module address_generator #(
       start_macro_id_q <= start_macro_id_d;
       window_size_q    <= window_size_d;
       agu_mode_q       <= agu_mode_d;
-      window_id_q      <= window_id_d;
       payload_q        <= payload_d;
       base_addr_q      <= base_addr_d;
-      bank_idx_q       <= bank_idx_d;
 
       req_cnt_q           <= req_cnt_d;
       bus_cnt_q           <= bus_cnt_d;

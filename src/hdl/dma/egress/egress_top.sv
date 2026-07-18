@@ -2,17 +2,17 @@ module egress_top #(
   parameter int N_STREAMS  = 4,
   parameter int M_MACROS   = 8,
   parameter int DATA_WIDTH = 32,
-  parameter int ADDR_WIDTH  = 32,
+  parameter int ADDR_WIDTH = 32,
   parameter int W_WORKERS  = 2,
   parameter int B_BANKS    = 2,
+  parameter int BANK_DEPTH = 16384,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
-  localparam int META_MASTER      = 1,
-  localparam int NUM_MASTERS      = W_WORKERS + META_MASTER,
-  localparam int META_WRT_BUS_IDX = NUM_MASTERS - META_MASTER
+  localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
+  localparam int DMA_MANAGERS     = W_WORKERS
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -31,27 +31,34 @@ module egress_top #(
   output logic [MACRO_PTR_WIDTH-1:0] bp_macro_sel_o [W_WORKERS],
 
   // Control IF
-  input logic                   start_bank_idx_i,
-  input logic  [DATA_WIDTH-1:0] l2_bank_base_i [B_BANKS],
-  input logic  [DATA_WIDTH-1:0] bank_limit_b_i,
-  input logic  [DATA_WIDTH-1:0] bank_header_size_b_i,
-  input logic  [B_BANKS-1:0]    bank_owner_i,
-  output logic [B_BANKS-1:0]    bank_full_o,
+  input logic                   enable_i,
+  input logic  [DATA_WIDTH-1:0] l2_bank_base_i,
 
   input logic [N_STREAMS-1:0]       stream_en_i,
   input logic [ADDR_WIDTH-1:0]      window_size_i  [N_STREAMS],
   input logic [MACRO_PTR_WIDTH-1:0] start_macro_i  [N_STREAMS],
   input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
 
-  input logic [N_STREAMS-1:0]    cfg_push_i,
-  input logic [4*DATA_WIDTH-1:0] cfg_wdata_i [N_STREAMS],
+  output logic                    job_dispatched_o,
+  input  logic [N_STREAMS-1:0]    cfg_push_i,
+  input  logic [4*DATA_WIDTH-1:0] cfg_wdata_i [N_STREAMS],
+
+  // Meta IF
+  input  logic                        meta_req_i,
+  input  logic [ADDR_WIDTH-1:0]       meta_addr_i,
+  output logic                        meta_gnt_o,
+  input  logic                        meta_wen_i ,
+  input  logic [DATA_WIDTH-1:0]       meta_wdata_i,
+  input  logic [DATA_WIDTH_BYTES-1:0] meta_be_i,
+
+  output logic [DATA_WIDTH-1:0] meta_r_rdata_o,
+  output logic                  meta_r_valid_o,
 
   // Bus IF
-  input  logic [NUM_MASTERS-1:0]    bus_ready_i,
-  output logic [NUM_MASTERS-1:0]    bus_valid_o,
-  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o  [NUM_MASTERS],
-  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [NUM_MASTERS],
-  output logic [DATA_WIDTH-1:0]     bus_wdata_o [NUM_MASTERS]
+  input  logic [DMA_MANAGERS-1:0]   bus_ready_i,
+  output logic [DMA_MANAGERS-1:0]   bus_valid_o,
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [DMA_MANAGERS],
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o [DMA_MANAGERS]
 );
 
   // ############
@@ -105,7 +112,11 @@ module egress_top #(
   logic [W_WORKERS-1:0]        worker_done;
   logic [WORKER_PTR_WIDTH-1:0] job_wid;
   logic [ADDR_WIDTH-1:0]       job_addr;
-  logic [BANK_PTR_WIDTH-1:0]   job_bank;
+
+  logic                  fifo_ready;
+  logic                  fifo_valid;
+  logic [DATA_WIDTH-1:0] fifo_data;
+  logic [ADDR_WIDTH-1:0] cpu_done_ptr;
 
   l2_allocator #(
     .DATA_WIDTH(DATA_WIDTH),
@@ -118,45 +129,62 @@ module egress_top #(
 
     .job_req_i(u_job_req_if.rx_ready),
 
-    .start_bank_idx_i(start_bank_idx_i),
+    .enable_i(enable_i),
     .l2_bank_base_i(l2_bank_base_i),
-    .bank_limit_b_i(bank_limit_b_i),
-    .bank_header_size_b_i(bank_header_size_b_i),
-    .bank_owner_i(bank_owner_i),
-    .bank_full_o(bank_full_o),
+    .job_dispatched_o(job_dispatched_o),
 
     .worker_done_i(worker_done),
     .job_wid_o(job_wid),
     .job_addr_o(job_addr),
-    .job_bank_o(job_bank),
     .job_assign_o(u_job_assign_if.tx_push),
 
-    .meta_req_o(u_meta_req_if.tx_ready)
+    .fifo_ready_i(fifo_ready),
+    .fifo_valid_o(fifo_valid),
+    .fifo_data_o(fifo_data),
+    .cpu_done_ptr_i(cpu_done_ptr)
   );
 
 
-  // ###########
-  // Meta Writer
+  // #####
+  // Meta
 
-  meta_writer #(
+  logic [W_WORKERS-1:0]        ptr_valid;
+  logic [STREAM_PTR_WIDTH-1:0] ptr_stream_id [W_WORKERS];
+  logic [ADDR_WIDTH-1:0]       ptr           [W_WORKERS];
+
+  meta #(
+    .N_STREAMS(N_STREAMS),
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
-    .B_BANKS(B_BANKS)
-  ) u_meta_writer (
+    .W_WORKERS(W_WORKERS),
+    .B_BANKS(B_BANKS),
+    .BANK_DEPTH(BANK_DEPTH)
+  ) u_meta (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
-    .meta_req_i(u_meta_req_if.rx_ready),
-
+    .enable_i(enable_i),
     .l2_bank_base_i(l2_bank_base_i),
 
-    .bus_ready_i(bus_ready_i[META_WRT_BUS_IDX]),
-    .bus_valid_o(bus_valid_o[META_WRT_BUS_IDX]),
-    .bus_bank_o(bus_bank_o[META_WRT_BUS_IDX]),
-    .bus_addr_o(bus_addr_o[META_WRT_BUS_IDX]),
-    .bus_wdata_o(bus_wdata_o[META_WRT_BUS_IDX])
-  );
+    .meta_req_i(meta_req_i),
+    .meta_addr_i(meta_addr_i),
+    .meta_gnt_o(meta_gnt_o),
+    .meta_wen_i(meta_wen_i),
+    .meta_wdata_i(meta_wdata_i),
+    .meta_be_i(meta_be_i),
 
+    .meta_r_rdata_o(meta_r_rdata_o),
+    .meta_r_valid_o(meta_r_valid_o),
+
+    .fifo_ready_o(fifo_ready),
+    .fifo_valid_i(fifo_valid),
+    .fifo_data_i(fifo_data),
+    .cpu_done_ptr_o(cpu_done_ptr),
+
+    .ptr_valid_i(ptr_valid),
+    .ptr_stream_id_i(ptr_stream_id),
+    .ptr_i(ptr)
+  );
 
 
   // ############
@@ -182,13 +210,16 @@ module egress_top #(
         .clk_i(clk_i),
         .rst_ni(rst_ni),
 
+        .next_pointer_i(next_pointer_i),
+
         .sel_i(worker_sel[i]),
         .job_assign_i(u_job_assign_if.rx_push),
         .job_addr_i(job_addr),
-        .job_bank_i(job_bank),
         .job_done_o(worker_done[i]),
 
-        .next_pointer_i(next_pointer_i),
+        .ptr_valid_o(ptr_valid[i]),
+        .ptr_stream_id_o(ptr_stream_id[i]),
+        .ptr_o(ptr[i]),
 
         .bp_release_o(bp_release_all_o[i]),
         .bp_req_o(bp_req_o[i]),
@@ -200,7 +231,6 @@ module egress_top #(
 
         .bus_ready_i(bus_ready_i[i]),
         .bus_valid_o(bus_valid_o[i]),
-        .bus_bank_o(bus_bank_o[i]),
         .bus_addr_o(bus_addr_o[i]),
         .bus_wdata_o(bus_wdata_o[i])
       );

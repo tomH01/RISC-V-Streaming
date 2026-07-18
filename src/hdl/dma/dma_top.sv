@@ -10,8 +10,8 @@ module dma_top #(
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
-  localparam int META_MASTER      = 1,
-  localparam int NUM_MASTERS      = W_WORKERS + META_MASTER
+  localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
+  localparam int DMA_MANAGERS     = W_WORKERS
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -26,23 +26,33 @@ module dma_top #(
   output logic                  pready_o,
   output logic                  pslverr_o,
 
-  // TCDM Bus IF
-  input  logic [NUM_MASTERS-1:0]    bus_ready_i,
-  output logic [NUM_MASTERS-1:0]    bus_valid_o,
-  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o  [NUM_MASTERS],
-  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [NUM_MASTERS],
-  output logic [DATA_WIDTH-1:0]     bus_wdata_o [NUM_MASTERS]
+  // CPU IF
+  output logic job_dispatched_o,
+
+  // Bus Managers
+  input  logic [DMA_MANAGERS-1:0]   bus_ready_i,
+  output logic [DMA_MANAGERS-1:0]   bus_valid_o,
+  output logic [ADDR_WIDTH-1:0]     bus_addr_o  [DMA_MANAGERS],
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o [DMA_MANAGERS],
+
+  // Bus Subordinate
+  input  logic                        meta_req_i,
+  input  logic [ADDR_WIDTH-1:0]       meta_addr_i,
+  output logic                        meta_gnt_o,
+  input  logic                        meta_wen_i ,
+  input  logic [DATA_WIDTH-1:0]       meta_wdata_i,
+  input  logic [DATA_WIDTH_BYTES-1:0] meta_be_i,
+
+  output logic [DATA_WIDTH-1:0] meta_r_rdata_o,
+  output logic                  meta_r_valid_o
 );
 
   // #######
   // Control
 
-  logic                       cfg_dma_enable;  
-  logic [BANK_PTR_WIDTH-1:0]  cfg_start_bank_idx;
-  logic [DATA_WIDTH-1:0]      cfg_l2_bank_base [B_BANKS];
-  logic [DATA_WIDTH-1:0]      cfg_bank_limit_b;
-  logic [DATA_WIDTH-1:0]      cfg_bank_header_size_b;
-  logic [B_BANKS-1:0]         cfg_bank_owner;
+  logic                       cfg_dma_enable; 
+  logic                       cfg_egress_enable; 
+  logic [DATA_WIDTH-1:0]      cfg_l2_bank_base;
   logic [N_STREAMS-1:0]       cfg_stream_en;
   logic [DATA_WIDTH-1:0]      cfg_stream_interval [N_STREAMS];
   logic [ADDR_WIDTH-1:0]      cfg_window_size     [N_STREAMS];
@@ -50,8 +60,6 @@ module dma_top #(
   logic [N_STREAMS-1:0]       cfg_push;   
   logic [4*DATA_WIDTH-1:0]    cfg_wdata           [N_STREAMS];
   logic [MACRO_PTR_WIDTH-1:0] cfg_next_pointer    [M_MACROS];
-
-  logic [B_BANKS-1:0]         egr_bank_full;
 
   control #(
     .N_STREAMS(N_STREAMS),
@@ -74,17 +82,13 @@ module dma_top #(
     .pslverr_o(pslverr_o),
 
     .dma_enable_o(cfg_dma_enable),
-    .start_bank_idx_o(cfg_start_bank_idx),
+    .egress_enable_o(cfg_egress_enable),
     .l2_bank_base_o(cfg_l2_bank_base),
-    .bank_limit_b_o(cfg_bank_limit_b),
-    .bank_header_size_b_o(cfg_bank_header_size_b),
-    .bank_owner_o(cfg_bank_owner),
 
     .stream_en_o(cfg_stream_en),
     .window_size_o(cfg_window_size),
     .start_macro_o(cfg_start_macro),
 
-    .bank_full_i(egr_bank_full),
     .cfg_push_o(cfg_push),
     .cfg_wdata_o(cfg_wdata),
 
@@ -195,24 +199,30 @@ module dma_top #(
     .bp_addr_o(egr_addr),
     .bp_macro_sel_o(egr_macro_select),
 
-    .start_bank_idx_i(cfg_start_bank_idx),
+    .enable_i(cfg_egress_enable),
     .l2_bank_base_i(cfg_l2_bank_base),
-    .bank_limit_b_i(cfg_bank_limit_b),
-    .bank_header_size_b_i(cfg_bank_header_size_b),
-    .bank_owner_i(cfg_bank_owner),
-    .bank_full_o(egr_bank_full),
 
     .stream_en_i(cfg_stream_en),
     .window_size_i(cfg_window_size),
     .start_macro_i(cfg_start_macro),
     .next_pointer_i(cfg_next_pointer),
 
+    .job_dispatched_o(job_dispatched_o),
     .cfg_push_i(cfg_push),
     .cfg_wdata_i(cfg_wdata),
 
+    .meta_req_i(meta_req_i),
+    .meta_addr_i(meta_addr_i),
+    .meta_gnt_o(meta_gnt_o),
+    .meta_wen_i (meta_wen_i),
+    .meta_wdata_i(meta_wdata_i),
+    .meta_be_i(meta_be_i),
+
+    .meta_r_rdata_o(meta_r_rdata_o),
+    .meta_r_valid_o(meta_r_valid_o),
+
     .bus_ready_i(bus_ready_i),
     .bus_valid_o(bus_valid_o),
-    .bus_bank_o(bus_bank_o),
     .bus_addr_o(bus_addr_o),
     .bus_wdata_o(bus_wdata_o)
   );

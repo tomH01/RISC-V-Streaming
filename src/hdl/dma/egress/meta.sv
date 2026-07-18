@@ -15,7 +15,8 @@ module meta #(
   input logic rst_ni,
 
   // Control IF
-  // TODO: BASE ADDR SRAM
+  input logic                  enable_i,
+  input logic [DATA_WIDTH-1:0] l2_bank_base_i,
 
   // Subordinate IF
   input  logic                        meta_req_i,

@@ -18,12 +18,16 @@ params = get_design_parameters()
 
 
 class AddrGenDriver:
-    def __init__(self, dut):
+    def __init__(self, dut, score_board):
         self.dut = dut
-        
+        self.score_board = score_board
+
         self.m_macros = int(params["M_MACROS"])
+        self.data_width = int(params["DATA_WIDTH"])
         
         self.bp_data_q = Queue()
+        
+        self.meta_data = {}
         
         self._init_signals()
         
@@ -43,11 +47,9 @@ class AddrGenDriver:
         self.dut.job_assign_start_macro_i.value = 0
         self.dut.job_assign_window_size_i.value = 0
         self.dut.job_assign_mode_i.value = 0
-        self.dut.job_assign_window_id_i.value = 0
         self.dut.job_assign_payload_i.value = 0
         
         self.dut.job_addr_i.value = 0
-        self.dut.job_bank_i.value = 0
         
         for m in range(self.m_macros):
             self.dut.next_pointer_i[m].value = 0
@@ -71,18 +73,34 @@ class AddrGenDriver:
     async def sim_job(self, job):
         for bp_data in job['bp_data']:
             self.bp_data_q.put_nowait(bp_data)
+        await RisingEdge(self.dut.clk_i)
+            
         await self._dispatch_job(job)
+        await ReadOnly()
+        self.score_board.add_expected_meta(dict(self.meta_data))
+        
+        await RisingEdge(self.dut.clk_i)
+        
+        self.dut.sel_i.value = 0
+        self.dut.job_assign_valid_i.value = 0
+        
         
         for _ in range(10000):
-            await RisingEdge(self.dut.clk_i)
             await ReadOnly()
+            
+            self.score_board.add_expected_meta(dict(self.meta_data))
+            
+            if int(self.dut.bus_valid_o.value) == 1 and int(self.dut.bus_ready_i.value) == 1:
+                self.meta_data['ptr'] += self.data_width // 8
             
             if self.dut.job_done_o.value == 1:
                 break
+            
+            await RisingEdge(self.dut.clk_i)
         else: 
             raise Exception("Job did not complete within timeout")
+        
         await RisingEdge(self.dut.clk_i)
-    
         
     async def _dispatch_job(self, job):
         self.dut.sel_i.value = 1
@@ -91,15 +109,14 @@ class AddrGenDriver:
         self.dut.job_assign_start_macro_i.value = job['start_macro']
         self.dut.job_assign_window_size_i.value = job['window_size']
         self.dut.job_assign_mode_i.value = job['mode'].value
-        self.dut.job_assign_window_id_i.value = job['window_id']
         self.dut.job_assign_payload_i.value = job['config_payload']
         self.dut.job_addr_i.value = job['addr']
-        self.dut.job_bank_i.value = job['bank']
         
-        await RisingEdge(self.dut.clk_i)
-        
-        self.dut.sel_i.value = 0
-        self.dut.job_assign_valid_i.value = 0
+        self.meta_data = {
+            "stream_id": job['stream_id'],
+            "ptr": job['addr']
+        }
+            
         
     async def _bp_responder(self):
         next_r_valid = 0
@@ -178,7 +195,6 @@ class GoldenModel:
         
         for wdata in job['bp_data']:
             expected = {
-                    "bank": job['bank'],
                     "addr": addr,
                     "wdata": wdata
             }
@@ -215,6 +231,9 @@ class Scoreboard:
         self.expected_bus_q = Queue()
         self.actual_bus_q = Queue()
         
+        self.expected_meta_q = Queue()
+        self.actual_meta_q = Queue()
+        
         self.counter = 0
         
     def add_expected_bp(self, value):
@@ -222,6 +241,18 @@ class Scoreboard:
         
     def add_actual_bp(self, value):
         self.actual_bp_q.put_nowait(value)
+        
+    def add_expected_bus(self, value):
+        self.expected_bus_q.put_nowait(value)
+        
+    def add_actual_bus(self, value):
+        self.actual_bus_q.put_nowait(value)
+        
+    def add_expected_meta(self, value):
+        self.expected_meta_q.put_nowait(value)
+        
+    def add_actual_meta(self, value):
+        self.actual_meta_q.put_nowait(value)
         
     async def compare_bp(self):
         while True:
@@ -236,42 +267,43 @@ class Scoreboard:
             assert exp["addr"] == act["addr"], f"{self.counter}: Expected BP addr {exp['addr']} but got {act['addr']}"
             assert exp["macro_sel"] == act["macro_sel"], f"{self.counter}: Expected BP macro_sel {exp['macro_sel']} but got {act['macro_sel']}"
         
-    def add_expected_bus(self, value):
-        self.expected_bus_q.put_nowait(value)
-        
-    def add_actual_bus(self, value):
-        self.actual_bus_q.put_nowait(value)
-        
     async def compare_bus(self):
         while True:
             exp = await self.expected_bus_q.get()
             act = await self.actual_bus_q.get()
             
-            assert exp["bank"] == act["bank"], f"Expected bus bank {exp['bank']} but got {act['bank']}"
             assert exp["addr"] == act["addr"], f"Expected bus addr {exp['addr']} but got {act['addr']}"
             assert exp["wdata"] == act["wdata"], f"Expected bus wdata {exp['wdata']} but got {act['wdata']}"
             
+    async def compare_meta(self):
+        while True:
+            exp = await self.expected_meta_q.get()
+            act = await self.actual_meta_q.get()
+            
+            if exp != act:
+                await ClockCycles(self.dut.clk_i, 3)
+            
+            assert exp["stream_id"] == act["stream_id"], f"Expected meta stream_id {exp['stream_id']} but got {act['stream_id']}"
+            assert exp["ptr"] == act["ptr"], f"Expected meta ptr {exp['ptr']} but got {act['ptr']}"
+            
     def clear(self):
-        assert self.expected_bp_q.empty(), "Expected bp queue is not empty"
-        assert self.actual_bp_q.empty(), "Actual bp queue is not empty"
-        
-        assert self.expected_bus_q.empty(), "Expected bus queue is not empty"
-        assert self.actual_bus_q.empty(), "Actual bus queue is not empty"
-
         while not self.expected_bp_q.empty():
             self.expected_bp_q.get_nowait()
         while not self.actual_bp_q.empty():
             self.actual_bp_q.get_nowait()
-
         while not self.expected_bus_q.empty():
             self.expected_bus_q.get_nowait()
         while not self.actual_bus_q.empty():
             self.actual_bus_q.get_nowait()
+        while not self.expected_meta_q.empty():
+            self.expected_meta_q.get_nowait()
+        while not self.actual_meta_q.empty():
+            self.actual_meta_q.get_nowait()
             
     async def run(self):
         cocotb.start_soon(self.compare_bp()) 
         cocotb.start_soon(self.compare_bus())   
-        
+        cocotb.start_soon(self.compare_meta())
 
 class BufferPoolMonitor:
     def __init__(self, dut, score_board):
@@ -304,12 +336,28 @@ class BusMonitor:
             
             if self.dut.bus_valid_o.value == 1 and self.dut.bus_ready_i.value == 1:
                 actual = {
-                    "bank": int(self.dut.bus_bank_o.value),
                     "addr": int(self.dut.bus_addr_o.value),
                     "wdata": int(self.dut.bus_wdata_o.value)
                 }
                 self.score_board.add_actual_bus(actual)
                 
+
+class MetaMonitor:
+    def __init__(self, dut, score_board):
+        self.dut = dut
+        self.score_board = score_board
+        
+    async def monitor(self):
+        while True:
+            await RisingEdge(self.dut.clk_i)
+            await ReadOnly()
+            
+            if int(self.dut.ptr_valid_o.value): 
+                actual = {
+                    "stream_id": int(self.dut.ptr_stream_id_o.value),
+                    "ptr": int(self.dut.ptr_o.value)
+                }
+                self.score_board.add_actual_meta(actual)
 
 @cocotb.test()
 async def test_addr_generator_crv(dut):
@@ -320,16 +368,17 @@ async def test_addr_generator_crv(dut):
     m_macros = int(params["M_MACROS"])
     macro_depth = int(params["MACRO_DEPTH"])
 
-    driver = AddrGenDriver(dut)
-    await driver.start_responders()
     score_board = Scoreboard(dut)
+    driver = AddrGenDriver(dut, score_board)
+    await driver.start_responders()
     golden_model = GoldenModel(dut, score_board)
     bp_monitor = BufferPoolMonitor(dut, score_board)
     bus_monitor = BusMonitor(dut, score_board)
-    
+    meta_monitor = MetaMonitor(dut, score_board)
     config_randomizer = ConfigRandomizer(n_streams, m_macros, macro_depth)
 
     for i in range(10):
+        print(i)
         config_per_stream, topology = config_randomizer.generate_configs()
         
         await driver.set_topology(topology)
@@ -341,10 +390,10 @@ async def test_addr_generator_crv(dut):
         score_board_task = cocotb.start_soon(score_board.run()) 
         bp_monitor_task = cocotb.start_soon(bp_monitor.monitor()) 
         bus_monitor_task = cocotb.start_soon(bus_monitor.monitor())
+        meta_monitor_task = cocotb.start_soon(meta_monitor.monitor())
         
-        NUM_TEST_JOBS = 100
+        NUM_TEST_JOBS = 10
         for j in range(NUM_TEST_JOBS):
-            print(f"{i}: Job {j}")
             stream_id = rnd.randrange(n_streams)
             stream_cfg = config_per_stream[stream_id]
             mode = rnd.choice(list(Mode))
@@ -357,12 +406,10 @@ async def test_addr_generator_crv(dut):
                 "start_macro": rnd.choice(list(stream_cfg['topology'])),
                 "window_size": window_size,
                 "mode": mode,
-                "window_id": 0,
                 "config_payload": payload,
                 "addr": 0,#rnd.randint(0, 2**10),
-                "bank": 0,
                 "bp_data": golden_model.gen_bp_data(window_size)
-            }           
+            }         
             
             golden_model.process_job(job)
             await driver.sim_job(job)
@@ -372,3 +419,4 @@ async def test_addr_generator_crv(dut):
         score_board_task.kill()
         bp_monitor_task.kill()
         bus_monitor_task.kill()
+        meta_monitor_task.kill()

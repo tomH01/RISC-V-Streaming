@@ -116,7 +116,7 @@ module sram_interconnect #(
     end else begin
       meta_addr_o  = '0;
       meta_wdata_o = '0;
-      meta_wen_o   = '0;
+      meta_wen_o   = '1;
       meta_be_o    = '0;
     end 
   end
@@ -168,7 +168,7 @@ module sram_interconnect #(
       bank_manager_q <= '{default:'0};
     end else begin
       for (int b = 0; b < NUM_SUBORDINATES; b++) begin
-        if (sram_req_o[b] && sram_gnt_i[b]) begin
+        if (sram_req_o[b] && sram_gnt_i[b] && xbar_dout[b].wen) begin
           bank_manager_q[b] <= xbar_idx_out[b];
         end
       end

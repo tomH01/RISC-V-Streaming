@@ -13,6 +13,9 @@ module address_generator_wrapper #(
   input logic clk_i,
   input logic rst_ni,
 
+  // Control IF
+  input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
+
   // Allocator IF
   input logic                        sel_i,
 
@@ -21,15 +24,15 @@ module address_generator_wrapper #(
   input logic [MACRO_PTR_WIDTH-1:0]  job_assign_start_macro_i,
   input logic [ADDR_WIDTH-1:0]       job_assign_window_size_i,
   input logic [3:0]                  job_assign_mode_i,
-  input logic [15:0]                 job_assign_window_id_i,
   input logic [95:0]                 job_assign_payload_i,
 
-  input logic [ADDR_WIDTH-1:0]     job_addr_i,
-  input logic [BANK_PTR_WIDTH-1:0] job_bank_i,
-  output logic                     job_done_o,
+  input logic [ADDR_WIDTH-1:0] job_addr_i,
+  output logic                 job_done_o,
 
-  // Control IF
-  input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
+  // Meta IF
+  output logic                        ptr_valid_o,
+  output logic [STREAM_PTR_WIDTH-1:0] ptr_stream_id_o,
+  output logic [ADDR_WIDTH-1:0]       ptr_o,
 
   // Buffer Pool IF
   output logic [M_MACROS-1:0]        bp_release_o,
@@ -43,7 +46,6 @@ module address_generator_wrapper #(
   // Bus IF
   input logic                       bus_ready_i,
   output logic                      bus_valid_o,
-  output logic [BANK_PTR_WIDTH-1:0] bus_bank_o,
   output logic [ADDR_WIDTH-1:0]     bus_addr_o,
   output logic [DATA_WIDTH-1:0]     bus_wdata_o
 );
@@ -59,7 +61,6 @@ module address_generator_wrapper #(
   assign u_job_assign_if.pkt.start_macro = job_assign_start_macro_i;
   assign u_job_assign_if.pkt.window_size = job_assign_window_size_i;
   assign u_job_assign_if.pkt.mode        = job_assign_mode_i;
-  assign u_job_assign_if.pkt.window_id   = job_assign_window_id_i;
   assign u_job_assign_if.pkt.payload     = job_assign_payload_i;
 
   address_generator #(
@@ -72,14 +73,17 @@ module address_generator_wrapper #(
   ) u_address_generator (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
+    
+    .next_pointer_i(next_pointer_i),
 
     .sel_i(sel_i),
     .job_assign_i(u_job_assign_if.rx_push),
     .job_addr_i(job_addr_i),
-    .job_bank_i(job_bank_i),
     .job_done_o(job_done_o),
 
-    .next_pointer_i(next_pointer_i),
+    .ptr_valid_o(ptr_valid_o),
+    .ptr_stream_id_o(ptr_stream_id_o),
+    .ptr_o(ptr_o),
 
     .bp_release_o(bp_release_o),
     .bp_req_o(bp_req_o),
@@ -91,7 +95,6 @@ module address_generator_wrapper #(
 
     .bus_ready_i(bus_ready_i),
     .bus_valid_o(bus_valid_o),
-    .bus_bank_o(bus_bank_o),
     .bus_addr_o(bus_addr_o),
     .bus_wdata_o(bus_wdata_o)
   );

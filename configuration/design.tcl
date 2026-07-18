@@ -30,10 +30,9 @@ set egress_hdl [list \
   "src/hdl/common/mem/fifo.sv" \
   "src/hdl/common/arb/rr_arbiter.sv" \
   "src/hdl/dma/egress/job_if.sv" \
-  "src/hdl/dma/egress/meta_if.sv" \
   "src/hdl/dma/egress/job_manager.sv" \
   "src/hdl/dma/egress/l2_allocator.sv" \
-  "src/hdl/dma/egress/meta_writer.sv" \
+  "src/hdl/dma/egress/meta.sv" \
   "src/hdl/dma/egress/strided_addr_gen.sv" \
   "src/hdl/dma/egress/address_generator.sv" \
   "src/hdl/dma/egress/egress_top.sv" \
@@ -52,13 +51,22 @@ set dma_hdl [concat \
 ]
 
 set xbar [list \
-  "src/hdl/common/interconnect/cc_lzc.sv" \
   "src/hdl/common/interconnect/cc_pkg.sv" \
+  "src/hdl/common/interconnect/cc_lzc.sv" \
   "src/hdl/common/interconnect/cc_rr_arb_tree.sv" \
   "src/hdl/common/interconnect/cc_spill_register.sv" \
   "src/hdl/common/interconnect/cc_spill_register_flushable.sv" \
   "src/hdl/common/interconnect/cc_stream_demux.sv" \
   "src/hdl/common/interconnect/cc_stream_xbar.sv" \
+]
+
+set l2_subsystem_hdl [concat \
+  $xbar \
+  [list \
+    "src/hdl/memory/l2_sram_macro.sv" \
+    "src/hdl/top/sram_interconnect.sv" \
+    "src/hdl/top/l2_subsystem.sv" \
+  ] 
 ]
 
 # ------
@@ -177,7 +185,6 @@ set l2_allocator_wrapper [EDA::Design::createComponent l2_allocator_wrapper]
 
 $l2_allocator_wrapper addHDLSourceFiles [list \
   "src/hdl/dma/egress/job_if.sv" \
-  "src/hdl/dma/egress/meta_if.sv" \
   "src/hdl/dma/egress/l2_allocator.sv" \
   "src/test/dma/egress/l2_allocator_wrapper.sv" \
 ]
@@ -187,17 +194,15 @@ $l2_allocator_wrapper addPythonSimFiles [concat $global_sim_files [list \
 ]]
 
 
-set meta_writer_wrapper [EDA::Design::createComponent meta_writer_wrapper]  
+set meta [EDA::Design::createComponent meta]
 
-$meta_writer_wrapper addHDLSourceFiles [list \
-  "src/hdl/common/mem/fifo.sv" \
-  "src/hdl/dma/egress/meta_if.sv" \
-  "src/hdl/dma/egress/meta_writer.sv" \
-  "src/test/dma/egress/meta_writer_wrapper.sv" \
+$meta addHDLSourceFiles [list \
+  "src/hdl/common/mem/fwft_fifo.sv" \
+  "src/hdl/dma/egress/meta.sv" \
 ]
 
-$meta_writer_wrapper addPythonSimFiles [concat $global_sim_files $tools [list \
-  "src/test/dma/egress/test_meta_writer.py" \
+$meta addPythonSimFiles [concat $global_sim_files $tools [list \
+  "src/test/dma/egress/test_meta.py" \
 ]]
 
 
@@ -293,9 +298,8 @@ set top [EDA::Design::createComponent top]
 $top addHDLSourceFiles [concat \
   $xbar \
   $dma_hdl \
+  $l2_subsystem_hdl \
   [list \
-    "src/hdl/memory/l2_sram_macro.sv" \
-    "src/hdl/top/sram_interconnect.sv" \
     "src/hdl/top/top.sv" \
   ]
 ]
@@ -306,6 +310,19 @@ $top addHDLIncludeDirectories [list \
 
 $top addPythonSimFiles [concat $global_sim_files $tools [list \
   "src/test/top/test_top.py" \
+]]
+
+
+set l2_subsystem [EDA::Design::createComponent l2_subsystem]
+
+$l2_subsystem addHDLSourceFiles $l2_subsystem_hdl
+
+$l2_subsystem addHDLIncludeDirectories [list \
+  "src/hdl/include" \
+]
+
+$l2_subsystem addPythonSimFiles [concat $global_sim_files $tools [list \
+  "src/test/top/test_l2_subsystem.py" \
 ]]
 
 
