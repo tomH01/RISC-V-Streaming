@@ -106,8 +106,6 @@ class GoldenModel:
             while len(self.fifo_mem) == 0:
                 await RisingEdge(self.dut.clk_i)
             
-            await RisingEdge(self.dut.clk_i)
-            
             pkt = self.fifo_mem.pop(0)
             
             # Write close bank count
@@ -149,19 +147,9 @@ class GoldenModel:
             self.bank_pointers[bank_idx] += 1
             self.bank_counters[bank_idx] += 1   
             
-    async def wait_for_bus(self):
-        while True:
-            await ReadOnly()
-            
-            if self.dut.bus_valid_o.value == 1 and self.dut.bus_ready_i.value == 1:
-                await RisingEdge(self.dut.clk_i)
-                break
-            await RisingEdge(self.dut.clk_i)
-            
     async def fifo(self):
         while True:
             await RisingEdge(self.dut.clk_i)
-            await ReadOnly()
 
             if self.dut.meta_valid_i.value == 1 and self.dut.meta_ready_o.value == 1:
                 pkt = {
@@ -262,7 +250,7 @@ async def test_meta_writer_crv(dut):
         
         await driver.send_rnd_meta(close_bank=close_bank, do_evict=do_evict)
             
-        if close_bank:
+        if close_bank or do_evict:
             for _ in range(timeout):
                 if dut.meta_done_o.value == 1:
                     break
