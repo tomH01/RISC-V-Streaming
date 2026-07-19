@@ -24,7 +24,6 @@ module control #(
 
   // Global Control IF
   output logic                      dma_enable_o,
-  output logic [BANK_PTR_WIDTH-1:0] start_bank_idx_o,
   output logic [DATA_WIDTH-1:0]     l2_bank_base_o [B_BANKS],
   output logic [DATA_WIDTH-1:0]     bank_limit_b_o,
   output logic [DATA_WIDTH-1:0]     bank_header_size_b_o,
@@ -177,7 +176,6 @@ module control #(
   end
 
   assign dma_enable_o         = global_ctrl_q[31];
-  assign start_bank_idx_o     = global_ctrl_q[BANK_PTR_WIDTH-1:0];
   assign l2_bank_base_o       = l2_bank_base_q;
   assign bank_limit_b_o       = bank_limit_b_q;
   assign bank_header_size_b_o = bank_header_size_b_q;

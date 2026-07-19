@@ -11,7 +11,9 @@ module meta_writer_wrapper #(
   // L2 Allocator IF
   input  logic                      meta_valid_i,
   input  logic                      meta_close_bank_i,
-  input  logic [BANK_PTR_WIDTH-1:0] meta_bank_idx_i,
+  input  logic [BANK_PTR_WIDTH-1:0] meta_close_idx_i,
+  input  logic                      meta_dispatch_i,
+  input  logic [BANK_PTR_WIDTH-1:0] meta_dispatch_idx_i,
   input  logic [DATA_WIDTH-1:0]     meta_window_id_i,
   input  logic [DATA_WIDTH-1:0]     meta_window_size_i,
   output logic                      meta_done_o,
@@ -57,7 +59,9 @@ module meta_writer_wrapper #(
 
   assign u_meta_req_if.valid           = meta_valid_i;
   assign u_meta_req_if.pkt.close_bank  = meta_close_bank_i;
-  assign u_meta_req_if.pkt.bank_idx    = meta_bank_idx_i;
+  assign u_meta_req_if.pkt.close_idx   = meta_close_idx_i;
+  assign u_meta_req_if.pkt.dispatch    = meta_dispatch_i;
+  assign u_meta_req_if.pkt.dispatch_idx = meta_dispatch_idx_i;
   assign u_meta_req_if.pkt.window_id   = meta_window_id_i;
   assign u_meta_req_if.pkt.window_size = meta_window_size_i;
   assign meta_ready_o                  = u_meta_req_if.ready;

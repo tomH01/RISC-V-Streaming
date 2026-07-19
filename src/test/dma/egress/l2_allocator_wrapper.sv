@@ -25,7 +25,6 @@ module l2_allocator_wrapper #(
   output logic                       job_ready_o,
 
   // Control IF
-  input logic [BANK_PTR_WIDTH-1:0] start_bank_idx_i,
   input logic [DATA_WIDTH-1:0]     l2_bank_base_i [B_BANKS],
   input logic [DATA_WIDTH-1:0]     bank_limit_b_i,
   input logic [DATA_WIDTH-1:0]     bank_header_size_b_i,
@@ -49,10 +48,12 @@ module l2_allocator_wrapper #(
 
   // Meta Writer IF:
   input  logic                      meta_done_i,
+  input  logic [BANK_PTR_WIDTH-1:0] meta_done_idx_i,
   input  logic                      meta_ready_i,
   output logic                      meta_valid_o,
   output logic                      meta_close_bank_o,
-  output logic [BANK_PTR_WIDTH-1:0] meta_bank_idx_o,
+  output logic [BANK_PTR_WIDTH-1:0] meta_dispatch_idx_o,
+  output logic [BANK_PTR_WIDTH-1:0] meta_close_idx_o,
   output logic [DATA_WIDTH-1:0]     meta_window_id_o,
   output logic [DATA_WIDTH-1:0]     meta_window_size_o
 );
@@ -91,15 +92,18 @@ module l2_allocator_wrapper #(
   assign payload_o     = u_job_assign_if.pkt.payload;
   assign job_valid_o   = u_job_assign_if.valid;
 
-  assign meta_done_i        = u_meta_req_if.done;
-  assign meta_ready_i       = u_meta_req_if.ready;
-  assign meta_valid_o       = u_meta_req_if.valid;
-  assign meta_close_bank_o  = u_meta_req_if.pkt.close_bank;
-  assign meta_bank_idx_o    = u_meta_req_if.pkt.bank_idx;
-  assign meta_window_id_o   = u_meta_req_if.pkt.window_id;
-  assign meta_window_size_o = u_meta_req_if.pkt.window_size;
+  assign u_meta_req_if.done     = meta_done_i;
+  assign u_meta_req_if.done_idx = meta_done_idx_i;
+  assign u_meta_req_if.ready    = meta_ready_i;
+  assign meta_valid_o           = u_meta_req_if.valid;
+  assign meta_close_bank_o      = u_meta_req_if.pkt.close_bank;
+  assign meta_dispatch_idx_o    = u_meta_req_if.pkt.dispatch_idx;
+  assign meta_close_idx_o       = u_meta_req_if.pkt.close_idx;
+  assign meta_window_id_o       = u_meta_req_if.pkt.window_id;
+  assign meta_window_size_o     = u_meta_req_if.pkt.window_size;
 
   l2_allocator #(
+    .N_STREAMS(N_STREAMS),
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
     .W_WORKERS(W_WORKERS),
@@ -110,7 +114,6 @@ module l2_allocator_wrapper #(
 
     .job_req_i(u_job_req_if.rx_ready),
 
-    .start_bank_idx_i(start_bank_idx_i),
     .l2_bank_base_i(l2_bank_base_i),
     .bank_limit_b_i(bank_limit_b_i),
     .bank_header_size_b_i(bank_header_size_b_i),

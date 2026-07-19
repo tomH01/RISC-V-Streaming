@@ -36,7 +36,7 @@ module meta_writer #(
 
   assign fifo_push        = meta_req_i.valid && !fifo_full;
   assign fifo_din         = meta_req_i.pkt;
-  assign meta_req_i.ready = !fifo_full;
+
 
   fifo #(
     .DATA_WIDTH(PKT_WIDTH),
@@ -65,21 +65,23 @@ module meta_writer #(
   logic [DATA_WIDTH-1:0] bank_cnt_q [B_BANKS], bank_cnt_d [B_BANKS];
   logic [DATA_WIDTH-1:0] bank_ptr_q [B_BANKS], bank_ptr_d [B_BANKS];
 
-  meta_pkt_t                 pkt_q,         pkt_d;
-  logic [BANK_PTR_WIDTH-1:0] closed_bank_q, closed_bank_d;
-  logic                      meta_done_q,   meta_done_d;
+  meta_pkt_t                 pkt_q,           pkt_d;
+  logic                      meta_done_q,     meta_done_d;
+  logic [BANK_PTR_WIDTH-1:0] meta_done_idx_q, meta_done_idx_d;
 
+  assign meta_req_i.ready = !fifo_full;
   assign meta_req_i.done = meta_done_q;
+  assign meta_req_i.done_idx = meta_done_idx_q;
 
   always_comb begin
     state_d       = state_q;
-
-    bank_cnt_d = bank_cnt_q;
-    bank_ptr_d = bank_ptr_q;
-
+    bank_cnt_d    = bank_cnt_q;
+    bank_ptr_d    = bank_ptr_q;
     pkt_d         = pkt_q;
-    closed_bank_d = closed_bank_q;
-    meta_done_d   = 1'b0;
+
+    meta_done_d     = 1'b0;
+    meta_done_idx_d = '0;
+
     fifo_pop      = 1'b0;
 
     bus_valid_o   = 1'b0;
@@ -99,36 +101,54 @@ module meta_writer #(
         pkt_d = fifo_dout;
 
         if (fifo_dout.close_bank) begin
-          closed_bank_d = pkt_q.bank_idx;
-          state_d       = WRITE_CLOSE_COUNT;
-        end else begin
+          state_d = WRITE_CLOSE_COUNT;
+        end 
+        else if (fifo_dout.dispatch) begin
           state_d = WRITE_WINDOW_ID;
+        end else begin
+          if (!fifo_empty) begin
+            fifo_pop = 1'b1;
+            state_d  = READ_FIFO;
+          end else begin
+            state_d = IDLE;
+          end
         end
       end
 
       WRITE_CLOSE_COUNT: begin
         bus_valid_o = 1'b1;
-        bus_bank_o  = closed_bank_q;
-        bus_addr_o  = l2_bank_base_i[closed_bank_q];
-        bus_wdata_o = bank_cnt_q[closed_bank_q];
+        bus_bank_o  = pkt_q.close_idx;
+        bus_addr_o  = l2_bank_base_i[pkt_q.close_idx];
+        bus_wdata_o = bank_cnt_q[pkt_q.close_idx];
 
         if (bus_ready_i) begin
-          meta_done_d = 1'b1;
-          bank_cnt_d[closed_bank_q] = '0;
-          bank_ptr_d[closed_bank_q] = DATA_WIDTH'(1);
-          state_d                   = WRITE_WINDOW_ID;
+          meta_done_d                 = 1'b1;
+          meta_done_idx_d             = pkt_q.close_idx;
+          bank_cnt_d[pkt_q.close_idx] = '0;
+          bank_ptr_d[pkt_q.close_idx] = DATA_WIDTH'(1);
+
+          if (pkt_q.dispatch) begin
+            state_d = WRITE_WINDOW_ID;
+          end else begin
+            if (!fifo_empty) begin
+              fifo_pop = 1'b1;
+              state_d  = READ_FIFO;
+            end else begin
+              state_d = IDLE;
+            end
+          end
         end
       end
 
       WRITE_WINDOW_ID: begin
         bus_valid_o = 1'b1;
-        bus_bank_o  = pkt_q.bank_idx;
-        bus_addr_o  = ADDR_WIDTH'(l2_bank_base_i[pkt_q.bank_idx] + 
-                                  bank_ptr_q[pkt_q.bank_idx] * DATA_WIDTH_BYTES);
+        bus_bank_o  = pkt_q.dispatch_idx;
+        bus_addr_o  = ADDR_WIDTH'(l2_bank_base_i[pkt_q.dispatch_idx] + 
+                                  bank_ptr_q[pkt_q.dispatch_idx] * DATA_WIDTH_BYTES);
         bus_wdata_o = pkt_q.window_id;
 
         if (bus_ready_i) begin
-          bank_ptr_d[pkt_q.bank_idx] = bank_ptr_q[pkt_q.bank_idx] + 1;
+          bank_ptr_d[pkt_q.dispatch_idx] = bank_ptr_q[pkt_q.dispatch_idx] + 1;
           state_d = WRITE_WINDOW_SIZE;
         end
       
@@ -136,14 +156,14 @@ module meta_writer #(
 
       WRITE_WINDOW_SIZE: begin
         bus_valid_o = 1'b1;
-        bus_bank_o  = pkt_q.bank_idx;
-        bus_addr_o  = ADDR_WIDTH'(l2_bank_base_i[pkt_q.bank_idx] + 
-                                  bank_ptr_q[pkt_q.bank_idx] * DATA_WIDTH_BYTES);
+        bus_bank_o  = pkt_q.dispatch_idx;
+        bus_addr_o  = ADDR_WIDTH'(l2_bank_base_i[pkt_q.dispatch_idx] + 
+                                  bank_ptr_q[pkt_q.dispatch_idx] * DATA_WIDTH_BYTES);
         bus_wdata_o = pkt_q.window_size;
 
         if (bus_ready_i) begin
-          bank_ptr_d[pkt_q.bank_idx] = bank_ptr_q[pkt_q.bank_idx] + 1;
-          bank_cnt_d[pkt_q.bank_idx] = bank_cnt_q[pkt_q.bank_idx] + 1;
+          bank_ptr_d[pkt_q.dispatch_idx] = bank_ptr_q[pkt_q.dispatch_idx] + 1;
+          bank_cnt_d[pkt_q.dispatch_idx] = bank_cnt_q[pkt_q.dispatch_idx] + 1;
 
           if (!fifo_empty) begin
             fifo_pop = 1'b1;
@@ -163,21 +183,15 @@ module meta_writer #(
   always_ff @(posedge clk_i or negedge rst_ni) begin 
     if (!rst_ni) begin
       state_q         <= IDLE;
-
       bank_cnt_q      <= '{default:'0};
       bank_ptr_q      <= '{default:DATA_WIDTH'(1)};
-
       pkt_q           <= '0;
-      closed_bank_q   <= '0;
       meta_done_q     <= '0;
     end else begin
       state_q         <= state_d;
-
       bank_cnt_q      <= bank_cnt_d;
       bank_ptr_q      <= bank_ptr_d;
-
       pkt_q           <= pkt_d;
-      closed_bank_q   <= closed_bank_d;
       meta_done_q     <= meta_done_d;
     end
   end

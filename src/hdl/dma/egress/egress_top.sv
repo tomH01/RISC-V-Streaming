@@ -31,7 +31,6 @@ module egress_top #(
   output logic [MACRO_PTR_WIDTH-1:0] bp_macro_sel_o [W_WORKERS],
 
   // Control IF
-  input logic                   start_bank_idx_i,
   input logic  [DATA_WIDTH-1:0] l2_bank_base_i [B_BANKS],
   input logic  [DATA_WIDTH-1:0] bank_limit_b_i,
   input logic  [DATA_WIDTH-1:0] bank_header_size_b_i,
@@ -118,7 +117,6 @@ module egress_top #(
 
     .job_req_i(u_job_req_if.rx_ready),
 
-    .start_bank_idx_i(start_bank_idx_i),
     .l2_bank_base_i(l2_bank_base_i),
     .bank_limit_b_i(bank_limit_b_i),
     .bank_header_size_b_i(bank_header_size_b_i),

@@ -38,7 +38,6 @@ module dma_top #(
   // Control
 
   logic                       cfg_dma_enable;  
-  logic [BANK_PTR_WIDTH-1:0]  cfg_start_bank_idx;
   logic [DATA_WIDTH-1:0]      cfg_l2_bank_base [B_BANKS];
   logic [DATA_WIDTH-1:0]      cfg_bank_limit_b;
   logic [DATA_WIDTH-1:0]      cfg_bank_header_size_b;
@@ -74,7 +73,6 @@ module dma_top #(
     .pslverr_o(pslverr_o),
 
     .dma_enable_o(cfg_dma_enable),
-    .start_bank_idx_o(cfg_start_bank_idx),
     .l2_bank_base_o(cfg_l2_bank_base),
     .bank_limit_b_o(cfg_bank_limit_b),
     .bank_header_size_b_o(cfg_bank_header_size_b),
@@ -195,7 +193,6 @@ module dma_top #(
     .bp_addr_o(egr_addr),
     .bp_macro_sel_o(egr_macro_select),
 
-    .start_bank_idx_i(cfg_start_bank_idx),
     .l2_bank_base_i(cfg_l2_bank_base),
     .bank_limit_b_i(cfg_bank_limit_b),
     .bank_header_size_b_i(cfg_bank_header_size_b),

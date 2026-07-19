@@ -52,8 +52,8 @@ set dma_hdl [concat \
 ]
 
 set xbar [list \
-  "src/hdl/common/interconnect/cc_lzc.sv" \
   "src/hdl/common/interconnect/cc_pkg.sv" \
+  "src/hdl/common/interconnect/cc_lzc.sv" \
   "src/hdl/common/interconnect/cc_rr_arb_tree.sv" \
   "src/hdl/common/interconnect/cc_spill_register.sv" \
   "src/hdl/common/interconnect/cc_spill_register_flushable.sv" \

@@ -62,7 +62,6 @@ class ControlDriver:
             case "bank_header_size_b":
                 addr = self.GLOBAL_BASE + self.BANK_HEADER_SIZE_B
             case "release_bank":
-                print(f"Sending release_bank config with data: {data}")
                 addr = self.GLOBAL_BASE + self.RELEASE_BANK
             case "bank_base":
                 addr = self.GLOBAL_BASE + self.BANK_BASE_OFFSET + bank_idx * 0x4
@@ -108,8 +107,7 @@ class ControlDriver:
         
         await self.apb.apb_write(addr, packed_data)
         
-    def get_global_control(self, dma_enable, start_bank_idx):
+    def get_global_control(self, dma_enable):
         dma_bit = (int(dma_enable) & 0x1) << 31
-        bank_idx_bits = int(start_bank_idx)
-        return dma_bit | bank_idx_bits        
+        return dma_bit        
     

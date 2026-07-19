@@ -29,13 +29,11 @@ async def test_global_control(dut):
     
     NUM_CYCLES = 1000
     for _ in range(NUM_CYCLES):    
-        dma_enable = rnd.choice([0, 1])
-        start_bank_idx = rnd.randrange(0, b_banks)        
-        global_control = driver.get_global_control(dma_enable, start_bank_idx)    
+        dma_enable = rnd.choice([0, 1])       
+        global_control = driver.get_global_control(dma_enable)    
         await driver.send_global_config("global_ctrl", global_control)
         await ReadOnly()
         assert int(dut.dma_enable_o.value) == dma_enable, f"Expected dma_enable_o to be {dma_enable}, got: {dut.dma_enable_o.value}"
-        assert int(dut.start_bank_idx_o.value) == start_bank_idx, f"Expected start_bank_idx_o to be {start_bank_idx}, got: {dut.start_bank_idx_o.value}"
         await FallingEdge(dut.clk_i)
         
         bank_limit_b = rnd.getrandbits(32)

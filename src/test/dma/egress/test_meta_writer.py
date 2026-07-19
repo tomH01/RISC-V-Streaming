@@ -28,7 +28,9 @@ class MetaWriterDriver:
         self.dut.meta_valid_i.value = 0
         self.dut.meta_done_o.value = 0
         self.dut.meta_close_bank_i.value = 0
-        self.dut.meta_bank_idx_i.value = 0
+        self.dut.meta_close_idx_i.value = 0
+        self.dut.meta_dispatch_i.value = 0
+        self.dut.meta_dispatch_idx_i.value = 0
         self.dut.meta_window_id_i.value = 0
         self.dut.meta_window_size_i.value = 0
         
@@ -52,23 +54,29 @@ class MetaWriterDriver:
     async def mock_bus(self):
         while True:
             await RisingEdge(self.dut.clk_i)
-            self.dut.bus_ready_i.value = int(rnd.random() < 0.5)
+            self.dut.bus_ready_i.value = int(rnd.random() < 0.7)
 
-    async def send_rnd_meta(self, close_bank=False): 
-        if close_bank:
+    async def send_rnd_meta(self, close_bank=False, do_evict=False): 
+        dispatch_idx = self.current_bank_idx
+        close_idx = self.current_bank_idx        
+        
+        if close_bank or do_evict:
             self.current_bank_idx = (self.current_bank_idx + 1) % self.b_banks
+        
         window_id = rnd.randint(0, 2**int(params["DATA_WIDTH"]) - 1)
         window_size = rnd.randint(0, 2**int(params["DATA_WIDTH"]) - 1)
         
         self.dut.meta_valid_i.value = 1
-        self.dut.meta_close_bank_i.value = int(close_bank)
-        self.dut.meta_bank_idx_i.value = self.current_bank_idx
+        self.dut.meta_close_bank_i.value = int(close_bank or do_evict)
+        self.dut.meta_close_idx_i.value = close_idx
+        self.dut.meta_dispatch_i.value = int(not do_evict)
+        self.dut.meta_dispatch_idx_i.value = dispatch_idx if not do_evict else 0
         self.dut.meta_window_id_i.value = window_id
         self.dut.meta_window_size_i.value = window_size
         await RisingEdge(self.dut.clk_i)
         self.dut.meta_valid_i.value = 0
         self.dut.meta_close_bank_i.value = 0
-        self.dut.meta_bank_idx_i.value = 0
+        self.dut.meta_dispatch_idx_i.value = 0
         self.dut.meta_window_id_i.value = 0
         self.dut.meta_window_size_i.value = 0
         
@@ -89,7 +97,6 @@ class GoldenModel:
         
     async def initialize(self):
         await ReadOnly()
-        
         for b in range(self.b_banks):
             self.bank_bases[b] = int(self.dut.l2_bank_base_i[b].value)
         await RisingEdge(self.dut.clk_i)
@@ -105,8 +112,7 @@ class GoldenModel:
             
             # Write close bank count
             if pkt["close_bank"] == 1:
-                closed_bank = (pkt["bank_idx"] - 1) % self.b_banks
-                
+                closed_bank = pkt["close_idx"]
                 
                 result = {
                     "bank": closed_bank,
@@ -117,9 +123,12 @@ class GoldenModel:
                 
                 self.bank_counters[closed_bank] = 0
                 self.bank_pointers[closed_bank] = 1
+            
+            if pkt["dispatch"] == 0:
+                continue
                 
             # Write window id
-            bank_idx = pkt["bank_idx"]
+            bank_idx = pkt["dispatch_idx"]
             address = self.bank_bases[bank_idx] + self.bank_pointers[bank_idx] * self.data_width_bytes
             result = {
                 "bank": bank_idx,
@@ -157,7 +166,9 @@ class GoldenModel:
             if self.dut.meta_valid_i.value == 1 and self.dut.meta_ready_o.value == 1:
                 pkt = {
                     "close_bank": int(self.dut.meta_close_bank_i.value),
-                    "bank_idx": int(self.dut.meta_bank_idx_i.value),
+                    "close_idx": int(self.dut.meta_close_idx_i.value),
+                    "dispatch": int(self.dut.meta_dispatch_i.value),
+                    "dispatch_idx": int(self.dut.meta_dispatch_idx_i.value),
                     "window_id": int(self.dut.meta_window_id_i.value),
                     "window_size": int(self.dut.meta_window_size_i.value)
                 }
@@ -245,8 +256,11 @@ async def test_meta_writer_crv(dut):
         else:
             raise Exception("Timeout waiting for meta_ready_o to be 1")
         
+        dice = rnd.random()
         close_bank = rnd.random() < 0.1 and i > 0
-        await driver.send_rnd_meta(close_bank=close_bank)
+        do_evict = (0.15 <= dice < 0.25) and i > 0
+        
+        await driver.send_rnd_meta(close_bank=close_bank, do_evict=do_evict)
             
         if close_bank:
             for _ in range(timeout):
