@@ -4,7 +4,6 @@ dict set ::params DATA_WIDTH 32
 dict set ::params ADDR_WIDTH 32
 dict set ::params MACRO_DEPTH 256
 dict set ::params B_BANKS 5
-dict set ::params DATA_WIDTH 32
 dict set ::params DEPTH 8
 dict set ::params NUM_REQS 4
 dict set ::params NUM_READ_PORTS 10
