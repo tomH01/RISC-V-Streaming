@@ -41,10 +41,11 @@ module l2_allocator_wrapper #(
   output logic [95:0]                 payload_o,
 
   // Meta IF:
-  input  logic                  fifo_ready_i,
-  output logic                  fifo_valid_o,
-  output logic [DATA_WIDTH-1:0] fifo_data_o,
-  input logic  [ADDR_WIDTH-1:0] cpu_done_ptr_i
+  input  logic                        dispatch_ready_i,
+  output logic                        dispatch_valid_o,
+  output logic [DATA_WIDTH-1:0]       dispatch_data_o,
+  output logic [WORKER_PTR_WIDTH-1:0] dispatch_worker_id_o,
+  input logic  [ADDR_WIDTH-1:0]       cpu_done_ptr_i
 );
 
   job_if #(
@@ -98,9 +99,10 @@ module l2_allocator_wrapper #(
     .job_addr_o(job_addr_o),
     .job_assign_o(u_job_assign_if.tx_push),
 
-    .fifo_ready_i(fifo_ready_i),
-    .fifo_valid_o(fifo_valid_o),
-    .fifo_data_o(fifo_data_o),
+    .dispatch_ready_i(dispatch_ready_i),
+    .dispatch_valid_o(dispatch_valid_o),
+    .dispatch_data_o(dispatch_data_o),
+    .dispatch_worker_id_o(dispatch_worker_id_o),
     .cpu_done_ptr_i(cpu_done_ptr_i)
   );
 

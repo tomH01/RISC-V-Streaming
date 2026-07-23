@@ -37,7 +37,7 @@ class L2AllocatorDriver:
         
         self.dut.worker_done_i.value = 0
         
-        self.dut.fifo_ready_i.value = 1
+        self.dut.dispatch_ready_i.value = 1
         self.dut.cpu_done_ptr_i.value = 0
 
     async def reset(self):
@@ -161,14 +161,14 @@ class GoldenModel:
             
             job_valid = int(self.dut.job_valid_i.value)
             enable = int(self.dut.enable_i.value)
-            fifo_ready = int(self.dut.fifo_ready_i.value)
+            dispatch_ready = int(self.dut.dispatch_ready_i.value)
             occupied_space = (self.state['dispatch_ptr'] - int(self.dut.cpu_done_ptr_i.value)) % self.sram_size_b
             has_space_available = (occupied_space + window_size_b) <= self.sram_size_b
 
             worker_idx = self.get_idle_worker()
             
             # Dispatch
-            if job_valid and enable and worker_idx is not None and has_space_available and fifo_ready:
+            if job_valid and enable and worker_idx is not None and has_space_available and dispatch_ready:
                 job = {
                     'job_wid': worker_idx,
                     'job_addr': self.state['dispatch_ptr'],
@@ -198,7 +198,8 @@ class GoldenModel:
                 
     def _get_meta_data(self, stream_id, window_size):
         return {
-            "fifo_data": (stream_id << 27) | window_size
+            "dispatch_data": (stream_id << 27) | window_size,
+            "dispatch_worker_id": self.get_idle_worker()
         }
             
         
@@ -224,9 +225,10 @@ class OutputMonitor:
                 }
                 self.scoreboard.add_actual_job(job)   
                 
-            if self.dut.fifo_valid_o.value:
+            if self.dut.dispatch_valid_o.value:
                 meta = {
-                    "fifo_data": int(self.dut.fifo_data_o.value),
+                    "dispatch_data": int(self.dut.dispatch_data_o.value),
+                    "dispatch_worker_id": int(self.dut.dispatch_worker_id_o.value)
                 }
                 self.scoreboard.add_actual_meta(meta)      
             
@@ -277,7 +279,7 @@ class Scoreboard:
             if exp != act:
                 await RisingEdge(self.dut.clk_i)
             
-            assert exp["fifo_data"] == act["fifo_data"], f"Expected FIFO data {exp['fifo_data']}, got {act['fifo_data']}"
+            assert exp["dispatch_data"] == act["dispatch_data"], f"Expected dispatch data {exp['dispatch_data']}, got {act['dispatch_data']}"
     
     def clear(self):
         while not self.expected_job_q.empty():

@@ -28,6 +28,7 @@ module address_generator #(
 
   // Meta IF
   output logic                        ptr_valid_o,
+  output logic                        ptr_done_o,
   output logic [STREAM_PTR_WIDTH-1:0] ptr_stream_id_o,
   output logic [ADDR_WIDTH-1:0]       ptr_o,
 
@@ -198,7 +199,7 @@ module address_generator #(
   end
 
   assign bp_release_o = (state_q == FINISH) ? macro_mask_q : '0;
-
+  assign ptr_done_o   = job_done_o; 
 
   // Address Generation Logic
   logic [ADDR_WIDTH-1:0] addr_all [NUM_MODES];

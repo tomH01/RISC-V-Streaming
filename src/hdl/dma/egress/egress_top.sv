@@ -58,7 +58,26 @@ module egress_top #(
   input  logic [DMA_MANAGERS-1:0]   bus_ready_i,
   output logic [DMA_MANAGERS-1:0]   bus_valid_o,
   output logic [ADDR_WIDTH-1:0]     bus_addr_o  [DMA_MANAGERS],
-  output logic [DATA_WIDTH-1:0]     bus_wdata_o [DMA_MANAGERS]
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o [DMA_MANAGERS],
+
+  // Performance IF
+  // ##############
+
+  // Job Manager -> L2 Allocator
+  output logic perf_egr_job_req_valid_o,
+  output logic perf_egr_job_req_ready_o,
+
+  // L2 Allocator -> Meta
+  output logic perf_egr_meta_disp_valid_o,
+  output logic perf_egr_meta_disp_ready_o,
+
+  // Worker -> Buffer Pool
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bp_req_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bp_gnt_o,
+
+  // Worker -> Bus
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bus_valid_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bus_ready_o
 );
 
   // ############
@@ -75,12 +94,6 @@ module egress_top #(
     .M_MACROS(M_MACROS),
     .ADDR_WIDTH(ADDR_WIDTH)
   ) u_job_assign_if();
-
-  meta_if #(
-    .DATA_WIDTH(DATA_WIDTH),
-    .B_BANKS(B_BANKS)
-  ) u_meta_req_if();
-
 
   // ############
   // Job Manager
@@ -113,10 +126,11 @@ module egress_top #(
   logic [WORKER_PTR_WIDTH-1:0] job_wid;
   logic [ADDR_WIDTH-1:0]       job_addr;
 
-  logic                  fifo_ready;
-  logic                  fifo_valid;
-  logic [DATA_WIDTH-1:0] fifo_data;
-  logic [ADDR_WIDTH-1:0] cpu_done_ptr;
+  logic                        dispatch_ready;
+  logic                        dispatch_valid;
+  logic [DATA_WIDTH-1:0]       dispatch_data;
+  logic [WORKER_PTR_WIDTH-1:0] dispatch_worker_id;
+  logic [ADDR_WIDTH-1:0]       cpu_done_ptr;
 
   l2_allocator #(
     .DATA_WIDTH(DATA_WIDTH),
@@ -138,9 +152,10 @@ module egress_top #(
     .job_addr_o(job_addr),
     .job_assign_o(u_job_assign_if.tx_push),
 
-    .fifo_ready_i(fifo_ready),
-    .fifo_valid_o(fifo_valid),
-    .fifo_data_o(fifo_data),
+    .dispatch_ready_i(dispatch_ready),
+    .dispatch_valid_o(dispatch_valid),
+    .dispatch_data_o(dispatch_data),
+    .dispatch_worker_id_o(dispatch_worker_id),
     .cpu_done_ptr_i(cpu_done_ptr)
   );
 
@@ -149,6 +164,7 @@ module egress_top #(
   // Meta
 
   logic [W_WORKERS-1:0]        ptr_valid;
+  logic [W_WORKERS-1:0]        ptr_done;
   logic [STREAM_PTR_WIDTH-1:0] ptr_stream_id [W_WORKERS];
   logic [ADDR_WIDTH-1:0]       ptr           [W_WORKERS];
 
@@ -176,12 +192,14 @@ module egress_top #(
     .meta_r_rdata_o(meta_r_rdata_o),
     .meta_r_valid_o(meta_r_valid_o),
 
-    .fifo_ready_o(fifo_ready),
-    .fifo_valid_i(fifo_valid),
-    .fifo_data_i(fifo_data),
+    .dispatch_ready_o(dispatch_ready),
+    .dispatch_valid_i(dispatch_valid),
+    .dispatch_data_i(dispatch_data),
+    .dispatch_worker_id_i(dispatch_worker_id), 
     .cpu_done_ptr_o(cpu_done_ptr),
 
     .ptr_valid_i(ptr_valid),
+    .ptr_done_i(ptr_done),
     .ptr_stream_id_i(ptr_stream_id),
     .ptr_i(ptr)
   );
@@ -218,6 +236,7 @@ module egress_top #(
         .job_done_o(worker_done[i]),
 
         .ptr_valid_o(ptr_valid[i]),
+        .ptr_done_o(ptr_done[i]),
         .ptr_stream_id_o(ptr_stream_id[i]),
         .ptr_o(ptr[i]),
 
@@ -243,5 +262,18 @@ module egress_top #(
       bp_release_o |= bp_release_all_o[i];
     end
   end
+
+  // Performance IF
+  assign perf_egr_job_req_valid_o  = u_job_req_if.valid;
+  assign perf_egr_job_req_ready_o  = u_job_req_if.ready;
+
+  assign perf_egr_meta_disp_valid_o = dispatch_valid;
+  assign perf_egr_meta_disp_ready_o = dispatch_ready;
+
+  assign perf_egr_wkr_bp_req_o   = bp_req_o;
+  assign perf_egr_wkr_bp_gnt_o   = bp_gnt_i;
+
+  assign perf_egr_wkr_bus_valid_o = bus_valid_o;
+  assign perf_egr_wkr_bus_ready_o = bus_ready_i;
 
 endmodule

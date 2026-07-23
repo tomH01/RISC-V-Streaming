@@ -29,10 +29,11 @@ module l2_allocator #(
   job_if.tx_push                      job_assign_o,
 
   // Meta IF
-  input  logic                  fifo_ready_i,
-  output logic                  fifo_valid_o,
-  output logic [DATA_WIDTH-1:0] fifo_data_o,
-  input  logic [ADDR_WIDTH-1:0] cpu_done_ptr_i
+  input  logic                        dispatch_ready_i,
+  output logic                        dispatch_valid_o,
+  output logic [DATA_WIDTH-1:0]       dispatch_data_o,
+  output logic [WORKER_PTR_WIDTH-1:0] dispatch_worker_id_o,
+  input  logic [ADDR_WIDTH-1:0]       cpu_done_ptr_i
   );
 
   typedef job_req_i.job_pkt_t job_pkt_t;
@@ -78,15 +79,16 @@ module l2_allocator #(
   logic do_dispatch;
 
   assign job_not_empty = job_req_i.pkt.window_size != '0;
-  assign ready_cond    = enable_i && has_idle_worker && space_available && fifo_ready_i;
+  assign ready_cond    = enable_i && has_idle_worker && space_available && dispatch_ready_i;
   assign do_dispatch   = job_req_i.valid && ready_cond && job_not_empty;
   assign job_req_i.ready = ready_cond;
 
-  assign fifo_valid_o = do_dispatch;
-  assign fifo_data_o  = {
+  assign dispatch_valid_o     = do_dispatch;
+  assign dispatch_data_o      = {
      5'(job_req_i.pkt.stream_id),
     27'(job_req_i.pkt.window_size)
   };
+  assign dispatch_worker_id_o = idle_wid;
 
   // Next state logic
   always_comb begin

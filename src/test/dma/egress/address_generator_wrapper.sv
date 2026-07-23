@@ -31,6 +31,7 @@ module address_generator_wrapper #(
 
   // Meta IF
   output logic                        ptr_valid_o,
+  output logic                        ptr_done_o,
   output logic [STREAM_PTR_WIDTH-1:0] ptr_stream_id_o,
   output logic [ADDR_WIDTH-1:0]       ptr_o,
 
@@ -82,6 +83,7 @@ module address_generator_wrapper #(
     .job_done_o(job_done_o),
 
     .ptr_valid_o(ptr_valid_o),
+    .ptr_done_o(ptr_done_o),
     .ptr_stream_id_o(ptr_stream_id_o),
     .ptr_o(ptr_o),
 

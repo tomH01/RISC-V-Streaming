@@ -326,6 +326,17 @@ $l2_subsystem addPythonSimFiles [concat $global_sim_files $tools [list \
 ]]
 
 
+set performance_monitor [EDA::Design::createComponent performance_monitor]
+
+$performance_monitor addHDLSourceFiles [list \
+  "src/hdl/top/performance_monitor.sv" \
+]
+
+$performance_monitor addPythonSimFiles [concat $global_sim_files $tools [list \
+  "src/test/top/test_performance_monitor.py" \
+]]
+
+
 
 # memory_macro
 set memory_macro [EDA::Design::createComponent memory_macro]

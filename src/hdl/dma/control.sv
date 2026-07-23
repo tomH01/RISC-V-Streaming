@@ -42,14 +42,6 @@ module control #(
   // Stream Generator IF
   output logic [DATA_WIDTH-1:0] stream_interval_o [N_STREAMS]
 );
-  logic  is_apb_space;
-  assign is_apb_space = (paddr_i[27] == 1'b1);
-
-  logic wr_en;
-  assign pready_o  = is_apb_space & psel_i & penable_i;
-  assign wr_en     = pready_o & pwrite_i;
-  assign prdata_o  = '0;
-  assign pslverr_o = 1'b0;
 
   logic [DATA_WIDTH-1:0] global_ctrl_q;
   logic [DATA_WIDTH-1:0] egress_enable_q;
@@ -68,15 +60,26 @@ module control #(
 
   logic [DATA_WIDTH-1:0] stream_interval_q [N_STREAMS];
 
+  logic  is_apb_space;
+  assign is_apb_space = (paddr_i[27] == 1'b1);
+
   // 0x08000000 - 0x08000FFF: Global Configuration
   // 0x08001000 - 0x08001FFF: Stream Configurations
   // 0x08002000 - 0x08002FFF: Topology Configuration
   // 0x08003000 - 0x08003FFF: Stream Interval Configuration
-  logic is_global_cfg, is_stream_cfg, is_topology, is_stream_interval;
+  // 0x08004000 - 0x08004FFF: Performance Monitor
+  logic is_global_cfg, is_stream_cfg, is_topology, is_stream_interval, is_perf_mon;
   assign is_global_cfg      = (paddr_i[15:12] == 4'h0);
   assign is_stream_cfg      = (paddr_i[15:12] == 4'h1);
   assign is_topology        = (paddr_i[15:12] == 4'h2);
   assign is_stream_interval = (paddr_i[15:12] == 4'h3);
+  assign is_perf_mon        = (paddr_i[15:12] == 4'h4);
+
+  logic wr_en;
+  assign pready_o  = is_apb_space & !is_perf_mon & psel_i & penable_i;
+  assign wr_en     = pready_o & pwrite_i;
+  assign prdata_o  = '0;
+  assign pslverr_o = 1'b0;
 
   logic [11:0] global_offset; 
   logic [6:0]  stream_idx;

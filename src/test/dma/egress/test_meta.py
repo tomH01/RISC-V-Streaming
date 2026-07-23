@@ -30,10 +30,12 @@ class MetaDriver:
         self.dut.meta_wdata_i.value = 0
         self.dut.meta_be_i.value = 0
         
-        self.dut.fifo_valid_i.value = 0
-        self.dut.fifo_data_i.value = 0
+        self.dut.dispatch_valid_i.value = 0
+        self.dut.dispatch_data_i.value = 0
+        self.dut.dispatch_worker_id_i.value = 0
         
         self.dut.ptr_valid_i.value = 0
+        self.dut.ptr_done_i.value = 0
         for w in range(self.w_workers):
             self.dut.ptr_stream_id_i[w].value = 0
             self.dut.ptr_i[w].value = 0
@@ -46,15 +48,17 @@ class MetaDriver:
         self.dut.rst_ni.value = 1
         await RisingEdge(self.dut.clk_i)  
         
-    async def send_fifo_data(self, stream_id, size, base_addr):
+    async def send_dispatch_data(self, stream_id, size, base_addr, worker_id):
         data = ((stream_id & 0x1F) << 27) | ((size & 0x3FF) << 17) | (0x1FFFF & base_addr)
-        self.dut.fifo_valid_i.value = 1
-        self.dut.fifo_data_i.value = data
+        self.dut.dispatch_valid_i.value = 1
+        self.dut.dispatch_data_i.value = data
+        self.dut.dispatch_worker_id_i.value = worker_id
 
-    async def send_ptr_data(self, worker_id, stream_id, ptr):
+    async def send_ptr_data(self, worker_id, stream_id, ptr, done):
         self.dut.ptr_valid_i[worker_id].value = 1
+        self.dut.ptr_done_i[worker_id].value = done
         self.dut.ptr_stream_id_i[worker_id].value = stream_id
-        self.dut.ptr_i[worker_id].value = ptr
+        self.dut.ptr_i[worker_id].value = ptr        
         
     async def invalidate_ptr(self, worker_id):
         self.dut.ptr_valid_i[worker_id].value = 0
@@ -68,7 +72,7 @@ class MetaDriver:
         self.dut.meta_addr_i.value = addr
         self.dut.meta_wen_i.value = 1
     
-    async def req_fifo_data(self):
+    async def req_dispatch_data(self):
         addr = 0x84
         
         self.dut.meta_req_i.value = 1
@@ -84,7 +88,7 @@ class MetaDriver:
         self.dut.meta_wdata_i.value = ptr
         
     @staticmethod
-    def decode_fifo_data(data):
+    def decode_dispatch_data(data):
         stream_id = (data >> 27) & 0x1F
         size = (data >> 17) & 0x3FF
         base_addr = data & 0x1FFFF
@@ -114,7 +118,7 @@ class DMAMock:
             cpu_done_ptr = int(self.dut.cpu_done_ptr_o.value)            
             
             await RisingEdge(self.dut.clk_i)
-            self.dut.fifo_valid_i.value = 0            
+            self.dut.dispatch_valid_i.value = 0            
             
             dispatched_worker = -1
             if rnd.random() < 0.5:
@@ -123,13 +127,18 @@ class DMAMock:
                 
             for w, job in enumerate(self.jobs):
                 if job is not None and dispatched_worker != w:
-                    if job["ptr"] == (job["base_addr"] + job["size"] - self.data_width_b) % self.sram_size_b:
+                    is_last_word = (job["ptr"] == (job["base_addr"] + job["size"] - self.data_width_b) % self.sram_size_b)
+                    
+                    if is_last_word:
                         self.jobs[w] = None
-                        await self.driver.invalidate_ptr(w)
+                        await self.driver.send_ptr_data(w, job["stream_id"], job["ptr"], done=1)
                     else: 
                         if rnd.random() < 0.8:
                             job["ptr"] = (job["ptr"] + self.data_width_b) % self.sram_size_b
-                            await self.driver.send_ptr_data(w, job["stream_id"], job["ptr"])
+                            await self.driver.send_ptr_data(w, job["stream_id"], job["ptr"], done=0)
+                            
+                elif job is None and dispatched_worker != w:
+                    await self.driver.invalidate_ptr(w)
             
     async def dispatch_rnd_job(self, cpu_done_ptr):
         new_job = self._get_rnd_job()        
@@ -146,14 +155,14 @@ class DMAMock:
                         "base_addr": self.dispatch_ptr, 
                         "ptr": self.dispatch_ptr
                     }
-                    await self.driver.send_fifo_data(new_job["stream_id"], new_job["size"], self.dispatch_ptr)
+                    await self.driver.send_dispatch_data(new_job["stream_id"], new_job["size"], self.dispatch_ptr, w)
                     self.dispatch_ptr = (self.dispatch_ptr + new_job["size"]) % self.sram_size_b
                     return w
                 
     def _get_rnd_job(self):
         return {
             "stream_id": rnd.randrange(self.n_streams),
-            "size": rnd.randint(1, 64) * self.data_width_b, 
+            "size": rnd.randint(1, 1024) * self.data_width_b, 
         } 
         
 
@@ -163,10 +172,6 @@ class GoldenModel:
         self.driver = driver
         self.scoreboard = scoreboard
         
-        self.stream_ptrs = [0] * int(params["N_STREAMS"])
-        self.cpu_done_ptr = 0
-        self.fifo = deque()
-        
         self.n_streams = int(params["N_STREAMS"])
         self.w_workers = int(params["W_WORKERS"])
         self.bank_depth = int(params["BANK_DEPTH"])
@@ -175,11 +180,16 @@ class GoldenModel:
         self.data_width_b = int(params["DATA_WIDTH"]) // 8
         self.sram_size_b = self.bank_depth * self.b_banks * self.data_width_b
         
+        self.stream_ptrs = [0] * int(params["N_STREAMS"])
+        self.cpu_done_ptr = 0
+        self.fifo = deque()
+        self.order_fifos = [deque() for _ in range(self.n_streams)]
+        self.retired_workers = [set() for _ in range(self.n_streams)]
+        
+        
     async def run(self):
         cpu_done_ptr_write = False
         cpu_done_ptr_temp = 0
-        
-        fifo_read_pending = False
         
         await ReadOnly()
         while True:    
@@ -218,36 +228,50 @@ class GoldenModel:
                 
             if current_fifo_r_req:
                 if len(self.fifo) > 0:
-                    actual["fifo_data"] = self.fifo.popleft()
+                    actual["dispatch_data"] = self.fifo.popleft()
                 else:
                     raise Exception("FIFO read pending but no data available.")
                 
             self.scoreboard.add_expected(actual)
             
             # fifo
-            if int(self.dut.fifo_valid_i.value) == 1 and int(self.dut.fifo_ready_o.value) == 1:
-                data = int(self.dut.fifo_data_i.value)
+            if int(self.dut.dispatch_valid_i.value) == 1 and int(self.dut.dispatch_ready_o.value) == 1:
+                data = int(self.dut.dispatch_data_i.value)
                 self.fifo.append(data)
                 
             # stream ptrs    
-            stream_ptrs_in = {i: [] for i in range(self.n_streams)}
             for w in range(self.w_workers):
-                if int(self.dut.ptr_valid_i[w].value) == 1:
+                if (self.dut.ptr_done_i[w].value) == 1 and (self.dut.ptr_valid_i[w].value) == 1:
                     stream_id = int(self.dut.ptr_stream_id_i[w].value)
-                    ptr = int(self.dut.ptr_i[w].value)
-                    stream_ptrs_in[stream_id].append(ptr)
+                    self.retired_workers[stream_id].add(w)
                     
-            for stream_id, ptrs in stream_ptrs_in.items():
-                if len(ptrs) > 0:
-                    min_ptr = min(ptrs)
-                    self.stream_ptrs[stream_id] = min_ptr
+            if int(self.dut.dispatch_valid_i.value) == 1 and int(self.dut.dispatch_ready_o.value) == 1:
+                data = int(self.dut.dispatch_data_i.value)
+                stream_id, _, _ = self.driver.decode_dispatch_data(data)
+                worker_id = int(self.dut.dispatch_worker_id_i.value)
+                self.order_fifos[stream_id].append(worker_id)
+                
+            for i in range(self.n_streams):
+                if len(self.order_fifos[i]) > 0:
+                    top_w = self.order_fifos[i][0]
+
+                    if int(self.dut.ptr_valid_i[top_w].value) == 1:
+                        self.stream_ptrs[i] = int(self.dut.ptr_i[top_w].value)
+                        
+                    top_is_retired = top_w in self.retired_workers[i]
+                    top_has_done = int(self.dut.ptr_done_i[top_w].value) == 1 and \
+                                   int(self.dut.ptr_stream_id_i[top_w].value) == i and \
+                                   int(self.dut.ptr_valid_i[top_w].value) == 1
+                                   
+                    if top_is_retired or top_has_done:
+                        self.order_fifos[i].popleft()
+                        if top_w in self.retired_workers[i]:
+                            self.retired_workers[i].remove(top_w)
 
             # cpu done ptr
             if cpu_done_ptr_write:
                 self.cpu_done_ptr = cpu_done_ptr_temp
                 cpu_done_ptr_write = False
-                
-            fifo_read_pending = current_fifo_r_req
         
 class OutputMonitor:
     def __init__(self, dut, scoreboard, driver, mode):
@@ -283,9 +307,9 @@ class OutputMonitor:
                             f"stream_ptr_{stream_id}": rdata
                         }
                         self.scoreboard.add_actual(actual)
-                    elif rtype == "fifo":
+                    elif rtype == "dispatch":
                         actual = {
-                            "fifo_data": rdata
+                            "dispatch_data": rdata
                         }
                         self.scoreboard.add_actual(actual)
                     
@@ -306,9 +330,9 @@ class OutputMonitor:
                 await self.driver.req_stream_ptr(req_stream_id)
                 pipeline.append([1, "stream_ptrs", req_stream_id])
                     
-            elif self.mode == "fifo":
-                await self.driver.req_fifo_data()
-                pipeline.append([1, "fifo", None])
+            elif self.mode == "dispatch":
+                await self.driver.req_dispatch_data()
+                pipeline.append([1, "dispatch", None])
         
 
 class Scoreboard:
@@ -330,7 +354,7 @@ class Scoreboard:
             actual = await self.actual_q.get()
             while True:
                 expected = await self.expected_q.get()
-                if "fifo_data" in actual and "fifo_data" not in expected:
+                if "dispatch_data" in actual and "dispatch_data" not in expected:
                     continue
                 break
             
@@ -361,7 +385,7 @@ async def test_meta(dut, mode):
     dma_mock = DMAMock(dut, driver)
     cocotb.start_soon(dma_mock.run())
     
-    NUM_CYCLES = 10000
+    NUM_CYCLES = 100000
     for _ in range(NUM_CYCLES):
         await RisingEdge(dut.clk_i)
         
@@ -374,5 +398,5 @@ async def test_meta_stream_ptrs(dut):
     await test_meta(dut, mode="stream_ptrs")
 
 @cocotb.test()
-async def test_meta_fifo(dut):
-    await test_meta(dut, mode="fifo")
+async def test_meta_dispatch(dut):
+    await test_meta(dut, mode="dispatch")

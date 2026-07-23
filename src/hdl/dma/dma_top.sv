@@ -44,7 +44,22 @@ module dma_top #(
   input  logic [DATA_WIDTH_BYTES-1:0] meta_be_i,
 
   output logic [DATA_WIDTH-1:0] meta_r_rdata_o,
-  output logic                  meta_r_valid_o
+  output logic                  meta_r_valid_o,
+
+  // Perfomance IF
+  output logic                 perf_dma_enable_o,
+
+  output logic [N_STREAMS-1:0] perf_ingr_stm_in_valid_o,
+  output logic [N_STREAMS-1:0] perf_ingr_stm_in_ready_o,
+
+  output logic                 perf_egr_job_req_valid_o,
+  output logic                 perf_egr_job_req_ready_o,
+  output logic                 perf_egr_meta_disp_valid_o,
+  output logic                 perf_egr_meta_disp_ready_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bp_req_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bp_gnt_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bus_valid_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bus_ready_o
 );
 
   // #######
@@ -162,7 +177,10 @@ module dma_top #(
     .cfg_next_pointer_i(cfg_next_pointer),
 
     .notif_valid_o(notif_valid),
-    .notif_start_macro_o(notif_start_macro)
+    .notif_start_macro_o(notif_start_macro),
+
+    .perf_ingr_stm_in_valid_o(perf_ingr_stm_in_valid_o),
+    .perf_ingr_stm_in_ready_o(perf_ingr_stm_in_ready_o)
   );
 
 
@@ -224,7 +242,16 @@ module dma_top #(
     .bus_ready_i(bus_ready_i),
     .bus_valid_o(bus_valid_o),
     .bus_addr_o(bus_addr_o),
-    .bus_wdata_o(bus_wdata_o)
+    .bus_wdata_o(bus_wdata_o),
+
+    .perf_egr_job_req_valid_o(perf_egr_job_req_valid_o),
+    .perf_egr_job_req_ready_o(perf_egr_job_req_ready_o),
+    .perf_egr_meta_disp_valid_o(perf_egr_meta_disp_valid_o),
+    .perf_egr_meta_disp_ready_o(perf_egr_meta_disp_ready_o),
+    .perf_egr_wkr_bp_req_o(perf_egr_wkr_bp_req_o),
+    .perf_egr_wkr_bp_gnt_o(perf_egr_wkr_bp_gnt_o),
+    .perf_egr_wkr_bus_valid_o(perf_egr_wkr_bus_valid_o),
+    .perf_egr_wkr_bus_ready_o(perf_egr_wkr_bus_ready_o)
   );
 
 

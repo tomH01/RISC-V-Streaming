@@ -1,4 +1,5 @@
 output/
+backup/
 output*/
 __pycache__
 .simvision

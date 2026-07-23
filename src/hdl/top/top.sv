@@ -17,7 +17,7 @@ module top #(
   input logic clk_i,
   input logic rst_ni,
 
-  // APB Target IF
+  // APB Subordinate IF
   input logic                   penable_i,
   input logic                   pwrite_i,
   input logic  [ADDR_WIDTH-1:0] paddr_i,
@@ -40,6 +40,22 @@ module top #(
   output logic job_dispatched_o
 );
 
+  logic is_perf_mon;
+  assign is_perf_mon = (paddr_i[15:12] == 4'h4);
+
+  logic psel_dma, psel_perf;
+  assign psel_dma  = psel_i & !is_perf_mon;
+  assign psel_perf = psel_i &  is_perf_mon;
+
+  logic [DATA_WIDTH-1:0] dma_prdata, perf_prdata;
+  logic                  dma_pready, perf_pready;
+  logic                  dma_pslverr, perf_pslverr;
+
+  assign prdata_o  = is_perf_mon ? perf_prdata  : dma_prdata;
+  assign pready_o  = is_perf_mon ? perf_pready  : dma_pready;
+  assign pslverr_o = is_perf_mon ? perf_pslverr : dma_pslverr;
+
+
   // DMA
 
   logic [DMA_MANAGERS-1:0] dma_ready;
@@ -57,6 +73,27 @@ module top #(
   logic [DATA_WIDTH-1:0] meta_r_rdata;
   logic                  meta_r_valid;
 
+  logic                 perf_dma_enable_o;
+  logic [N_STREAMS-1:0] perf_ingr_stm_in_valid;
+  logic [N_STREAMS-1:0] perf_ingr_stm_in_ready;
+  logic                 perf_egr_job_req_valid;
+  logic                 perf_egr_job_req_ready;
+  logic                 perf_egr_meta_disp_valid;
+  logic                 perf_egr_meta_disp_ready;
+  logic [W_WORKERS-1:0] perf_egr_wkr_bp_req;
+  logic [W_WORKERS-1:0] perf_egr_wkr_bp_gnt;
+  logic [W_WORKERS-1:0] perf_egr_wkr_bus_valid;
+  logic [W_WORKERS-1:0] perf_egr_wkr_bus_ready;
+  logic                 perf_cpu_l2_valid;
+  logic                 perf_cpu_l2_ready;
+  logic                 perf_cpu_meta_req;
+  logic                 perf_cpu_meta_gnt;
+
+  assign perf_cpu_l2_valid = cpu_valid_i;
+  assign perf_cpu_l2_ready = cpu_ready_o;
+  assign perf_cpu_meta_req = meta_req;
+  assign perf_cpu_meta_gnt = meta_gnt;
+
   dma_top #(
     .N_STREAMS(N_STREAMS),
     .M_MACROS(M_MACROS),
@@ -73,11 +110,11 @@ module top #(
     .penable_i(penable_i),
     .pwrite_i(pwrite_i),
     .paddr_i(paddr_i),
-    .psel_i(psel_i),
+    .psel_i(psel_dma),
     .pwdata_i(pwdata_i),
-    .prdata_o(prdata_o),
-    .pready_o(pready_o),
-    .pslverr_o(pslverr_o),
+    .prdata_o(dma_prdata),
+    .pready_o(dma_pready),
+    .pslverr_o(dma_pslverr),
 
     .job_dispatched_o(job_dispatched_o),
 
@@ -94,8 +131,21 @@ module top #(
     .meta_be_i(meta_be),
 
     .meta_r_rdata_o(meta_r_rdata),
-    .meta_r_valid_o(meta_r_valid)
+    .meta_r_valid_o(meta_r_valid),
+
+    .perf_dma_enable_o(perf_dma_enable_o),
+    .perf_ingr_stm_in_valid_o(perf_ingr_stm_in_valid),
+    .perf_ingr_stm_in_ready_o(perf_ingr_stm_in_ready),
+    .perf_egr_job_req_valid_o(perf_egr_job_req_valid),
+    .perf_egr_job_req_ready_o(perf_egr_job_req_ready),
+    .perf_egr_meta_disp_valid_o(perf_egr_meta_disp_valid),
+    .perf_egr_meta_disp_ready_o(perf_egr_meta_disp_ready),
+    .perf_egr_wkr_bp_req_o(perf_egr_wkr_bp_req),
+    .perf_egr_wkr_bp_gnt_o(perf_egr_wkr_bp_gnt),
+    .perf_egr_wkr_bus_valid_o(perf_egr_wkr_bus_valid),
+    .perf_egr_wkr_bus_ready_o(perf_egr_wkr_bus_ready)
   );
+
 
   // L2 Subsystem
 
@@ -132,6 +182,46 @@ module top #(
 
     .meta_r_rdata_i(meta_r_rdata),
     .meta_r_valid_i(meta_r_valid)
+  );
+
+
+  // Performance Monitor
+  performance_monitor #(
+    .N_STREAMS(N_STREAMS),
+    .W_WORKERS(W_WORKERS),
+    .DATA_WIDTH(DATA_WIDTH),
+    .ADDR_WIDTH(ADDR_WIDTH)
+  ) u_performance_monitor (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+
+    .penable_i(penable_i),
+    .pwrite_i(pwrite_i),
+    .paddr_i(paddr_i),
+    .psel_i(psel_perf),
+    .pwdata_i(pwdata_i),
+    .prdata_o(perf_prdata),
+    .pready_o(perf_pready),
+    .pslverr_o(perf_pslverr),
+
+    .dma_enable_i(perf_dma_enable_o),
+
+    .ingr_stm_in_valid_i(perf_ingr_stm_in_valid),
+    .ingr_stm_in_ready_i(perf_ingr_stm_in_ready),
+
+    .egr_job_req_valid_i(perf_egr_job_req_valid),
+    .egr_job_req_ready_i(perf_egr_job_req_ready),
+    .egr_meta_disp_valid_i(perf_egr_meta_disp_valid),
+    .egr_meta_disp_ready_i(perf_egr_meta_disp_ready),
+    .egr_wkr_bp_req_i(perf_egr_wkr_bp_req),
+    .egr_wkr_bp_gnt_i(perf_egr_wkr_bp_gnt),
+    .egr_wkr_bus_valid_i(perf_egr_wkr_bus_valid),
+    .egr_wkr_bus_ready_i(perf_egr_wkr_bus_ready),
+
+    .cpu_l2_valid_i(perf_cpu_l2_valid),
+    .cpu_l2_ready_i(perf_cpu_l2_ready),
+    .cpu_meta_req_i(perf_cpu_meta_req),
+    .cpu_meta_gnt_i(perf_cpu_meta_gnt)
   );
 
 endmodule

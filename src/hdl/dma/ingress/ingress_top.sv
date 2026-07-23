@@ -31,7 +31,11 @@ module ingress_top #(
 
   // Egress IF
   output logic [N_STREAMS-1:0]       notif_valid_o,
-  output logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_o [N_STREAMS]
+  output logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_o [N_STREAMS],
+
+  // Perfomance IF
+  output logic [N_STREAMS-1:0] perf_ingr_stm_in_valid_o,
+  output logic [N_STREAMS-1:0] perf_ingr_stm_in_ready_o
 );
 
   // ############
@@ -121,5 +125,9 @@ module ingress_top #(
     .bp_wdata_o(bp_wdata_o),
     .bp_be_o(bp_be_o)
   );
+
+  // Performance IF
+  assign perf_ingr_stm_in_valid_o = ch_valid;
+  assign perf_ingr_stm_in_ready_o = ch_ready;
 
 endmodule
