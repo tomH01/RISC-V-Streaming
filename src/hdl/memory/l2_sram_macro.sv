@@ -8,17 +8,17 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-`define MACRO_SIZE_PRI0 32768
-
-`define SYNOPSYS_MACRO_PRI0 sadclssd4LOW1p32768x32m16b8w1c0p1d0l0rm3sdrw01_wrapper
-
+`ifndef TARGET_FPGA
+  `define SYNOPSYS_MACRO_PRI0 sadclssd4LOW1p32768x32m16b8w1c0p1d0l0rm3sdrw01_wrapper
+`endif
 
 module l2_sram_macro #(
   parameter     MACRO_TYPE = "SYNOPSYS",
   parameter int B_BANKS    = 4,
+  parameter int BANK_DEPTH = 32768,
 
   localparam int BANK_PTR_WIDTH  = (B_BANKS > 1) ? $clog2(B_BANKS) : 1,
-  localparam int BANK_ADDR_WIDTH = $clog2(`MACRO_SIZE_PRI0)
+  localparam int BANK_ADDR_WIDTH = $clog2(BANK_DEPTH)
 )(
     input logic clk_i,
     input logic rst_ni,
@@ -66,36 +66,64 @@ module l2_sram_macro #(
         {8{be_i[i][0]}}
       };
 
-      if (MACRO_TYPE == "SYNOPSYS") begin : gen_asic_bank
-        `SYNOPSYS_MACRO_PRI0 bank_sram_pri0_i (
-            .Q  (r_rdata_o[i]),
-            .ADR(internal_bank_addr),
-            .D  (wdata_i[i]),
-            .WEM(BE_BW_BANK[i]),
-            .WE (~wen_i[i]),
-            .ME (req_i[i]),
-            .CLK(clk_i),
-            .LS(1'b0),
-            .DS(1'b0),
-            .SD(1'b0)
+      `ifndef TARGET_FPGA
+        if (MACRO_TYPE == "SYNOPSYS") begin : gen_asic_bank
+          `SYNOPSYS_MACRO_PRI0 bank_sram_pri0_i (
+              .Q  (r_rdata_o[i]),
+              .ADR(internal_bank_addr),
+              .D  (wdata_i[i]),
+              .WEM(BE_BW_BANK[i]),
+              .WE (~wen_i[i]),
+              .ME (req_i[i]),
+              .CLK(clk_i),
+              .LS(1'b0),
+              .DS(1'b0),
+              .SD(1'b0)
+          );
+        end else begin : gen_rtl_bank
+          tc_sram #(
+            .NumWords(BANK_DEPTH),
+            .DataWidth(32),
+            .NumPorts(1)
+          ) u_bank (
+            .clk_i(clk_i),
+            .rst_ni(rst_ni),
+            .req_i(req_i[i]),
+            .we_i(~wen_i[i]),
+            .addr_i(internal_bank_addr),
+            .wdata_i(wdata_i[i]),
+            .be_i(be_i[i]),
+            .rdata_o(r_rdata_o[i])
+          );
+        end
+      `else
+        xpm_memory_spram #(
+        .ADDR_WIDTH_A(BANK_ADDR_WIDTH),
+        .AUTO_SLEEP_TIME(0),
+        .BYTE_WRITE_WIDTH_A(8),
+        .CASCADE_HEIGHT(0),
+        .READ_DATA_WIDTH_A(32),
+        .READ_LATENCY_A(1),
+        .MEMORY_SIZE(BANK_DEPTH*32),
+        .MEMORY_PRIMITIVE("block"),
+        .WRITE_DATA_WIDTH_A(32),
+        .WRITE_MODE_A("read_first")
+      ) u_xpm_ram (
+          .clka(clk_i),
+          .rsta(~rst_ni),
+          .ena(req_i[i]),
+          .wea(be_i[i] & {4{~wen_i[i]}}),
+          .addra(internal_bank_addr),
+          .dina(wdata_i[i]),
+          .douta(r_rdata_o[i]),
+          .sleep(1'b0),
+          .sbiterra(),
+          .dbiterra(),
+          .injectsbiterra(1'b0),
+          .injectdbiterra(1'b0),
+          .regcea(1'b1)
         );
-      end else begin : gen_rtl_bank
-        tc_sram #(
-          .NumWords(`MACRO_SIZE_PRI0),
-          .WordWidth(32),
-          .NumPorts(1)
-        ) u_bank (
-          .clk_i(clk_i),
-          .rst_ni(rst_ni),
-          .req_i(req_i[i]),
-          .we_i(~wen_i[i]),
-          .addr_i(internal_bank_addr),
-          .wdata_i(wdata_i[i]),
-          .be_i(be_i[i]),
-          .rdata_o(r_rdata_o[i])
-        );
-      end
-
+      `endif
     end
   endgenerate
 

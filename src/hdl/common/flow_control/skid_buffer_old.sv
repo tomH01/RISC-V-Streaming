@@ -23,7 +23,7 @@ module skid_buffer #(
   assign ds_data_o  = data_q;
   assign ds_valid_o = data_valid_q;
 
-  assign us_ready_o = ~skid_valid_q;
+  assign us_ready_o = skid_valid_q;
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -32,7 +32,8 @@ module skid_buffer #(
       skid_q       <= '0;
       skid_valid_q <= 1'b0;
     end else begin
-      if (ds_ready_i || !data_valid_q) begin
+
+      if (ds_ready_i) begin
         if (skid_valid_q) begin
           // Skid data to output
           data_q       <= skid_q;
@@ -44,10 +45,17 @@ module skid_buffer #(
           data_valid_q <= us_valid_i;
         end
       end
+
       else if (us_valid_i && us_ready_o) begin
-        // Store to skid
-        skid_q       <= us_data_i;
-        skid_valid_q <= 1'b1;
+        if (!data_valid_q) begin
+          // Store to reg
+          data_q       <= us_data_i;
+          data_valid_q <= 1'b1;
+        end else begin
+          // Store to skid
+          skid_q       <= us_data_i;
+          skid_valid_q <= 1'b1;
+        end
       end
     end
   end

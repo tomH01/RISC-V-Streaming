@@ -54,7 +54,7 @@ class AddrGenDriver:
         for m in range(self.m_macros):
             self.dut.next_pointer_i[m].value = 0
             
-        self.dut.bp_gnt_i.value = 0
+        self.dut.bp_gnt_i.value = 1
         self.dut.bp_r_rdata_i.value = 0
         self.dut.bp_r_valid_i.value = 0
         
@@ -80,7 +80,7 @@ class AddrGenDriver:
         self.score_board.add_expected_meta(dict(self.meta_data))
         
         await RisingEdge(self.dut.clk_i)
-        
+
         self.dut.sel_i.value = 0
         self.dut.job_assign_valid_i.value = 0
         
@@ -141,6 +141,7 @@ class AddrGenDriver:
                 next_r_data = 0
                 
     async def _drive_gnt(self):
+        #self.dut.bp_gnt_i.value = 1
         while True:
             await Edge(self.dut.bp_req_o)
             self.dut.bp_gnt_i.value = self.dut.bp_req_o.value

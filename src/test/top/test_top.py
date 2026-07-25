@@ -61,8 +61,8 @@ class TopDriver:
         
     async def _send_stream_cfg(self, stream_id, cfg):
         await self.ctrl_driver.send_ingress_config("start_macro", cfg["start_macro"], stream_id)
-        await self.ctrl_driver.send_ingress_config("window_size", 200, stream_id)#cfg["window_size"], stream_id)
-        await self.ctrl_driver.send_stream_interval(stream_id, 1)#cfg["interval"])
+        await self.ctrl_driver.send_ingress_config("window_size", 100, stream_id) #cfg["window_size"], stream_id)
+        await self.ctrl_driver.send_stream_interval(stream_id, 1) #cfg["interval"])
         
     async def _send_topology_cfg(self, topology):
         for i in range(0, self.m_macros, 2):

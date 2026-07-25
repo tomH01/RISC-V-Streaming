@@ -73,7 +73,7 @@ module top #(
   logic [DATA_WIDTH-1:0] meta_r_rdata;
   logic                  meta_r_valid;
 
-  logic                 perf_dma_enable_o;
+  logic                 perf_dma_enable;
   logic [N_STREAMS-1:0] perf_ingr_stm_in_valid;
   logic [N_STREAMS-1:0] perf_ingr_stm_in_ready;
   logic                 perf_egr_job_req_valid;
@@ -102,6 +102,7 @@ module top #(
     .W_WORKERS(W_WORKERS),
     .B_BANKS(B_BANKS),
     .MACRO_DEPTH(MACRO_DEPTH),
+    .BANK_DEPTH(BANK_DEPTH),
     .STREAM_OFFSET_WIDTH(STREAM_OFFSET_WIDTH)
   ) u_dma_top (
     .clk_i(clk_i),
@@ -133,7 +134,7 @@ module top #(
     .meta_r_rdata_o(meta_r_rdata),
     .meta_r_valid_o(meta_r_valid),
 
-    .perf_dma_enable_o(perf_dma_enable_o),
+    .perf_dma_enable_o(perf_dma_enable),
     .perf_ingr_stm_in_valid_o(perf_ingr_stm_in_valid),
     .perf_ingr_stm_in_ready_o(perf_ingr_stm_in_ready),
     .perf_egr_job_req_valid_o(perf_egr_job_req_valid),
@@ -204,7 +205,7 @@ module top #(
     .pready_o(perf_pready),
     .pslverr_o(perf_pslverr),
 
-    .dma_enable_i(perf_dma_enable_o),
+    .dma_enable_i(perf_dma_enable),
 
     .ingr_stm_in_valid_i(perf_ingr_stm_in_valid),
     .ingr_stm_in_ready_i(perf_ingr_stm_in_ready),

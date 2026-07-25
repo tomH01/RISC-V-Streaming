@@ -1,11 +1,12 @@
 module egress_top #(
-  parameter int N_STREAMS  = 4,
-  parameter int M_MACROS   = 8,
-  parameter int DATA_WIDTH = 32,
-  parameter int ADDR_WIDTH = 32,
-  parameter int W_WORKERS  = 2,
-  parameter int B_BANKS    = 2,
-  parameter int BANK_DEPTH = 16384,
+  parameter int N_STREAMS   = 4,
+  parameter int M_MACROS    = 8,
+  parameter int DATA_WIDTH  = 32,
+  parameter int ADDR_WIDTH  = 32,
+  parameter int W_WORKERS   = 2,
+  parameter int B_BANKS     = 2,
+  parameter int MACRO_DEPTH = 256,
+  parameter int BANK_DEPTH  = 16384,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
@@ -136,7 +137,8 @@ module egress_top #(
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
     .W_WORKERS(W_WORKERS),
-    .B_BANKS(B_BANKS)
+    .B_BANKS(B_BANKS),
+    .BANK_DEPTH(BANK_DEPTH)
   ) u_l2_allocator (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
@@ -223,7 +225,8 @@ module egress_top #(
         .M_MACROS(M_MACROS),
         .DATA_WIDTH(DATA_WIDTH),
         .ADDR_WIDTH(ADDR_WIDTH),
-        .B_BANKS(B_BANKS)
+        .B_BANKS(B_BANKS),
+        .MACRO_DEPTH(MACRO_DEPTH)
       ) u_addr_generator (
         .clk_i(clk_i),
         .rst_ni(rst_ni),

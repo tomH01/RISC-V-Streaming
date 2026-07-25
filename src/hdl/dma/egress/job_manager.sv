@@ -7,9 +7,8 @@ module job_manager #(
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
-
-  localparam int STREAM_ID_WIDTH = 7,
-  localparam int LOCAL_ID_WIDTH  = DATA_WIDTH - STREAM_ID_WIDTH
+  localparam int STREAM_ID_WIDTH  = 7,
+  localparam int LOCAL_ID_WIDTH   = DATA_WIDTH - STREAM_ID_WIDTH
 )(
   input logic clk_i,
   input logic rst_ni,

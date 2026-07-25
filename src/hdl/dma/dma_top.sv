@@ -6,6 +6,7 @@ module dma_top #(
   parameter int W_WORKERS           = 1,
   parameter int B_BANKS             = 2,
   parameter int MACRO_DEPTH         = 256,
+  parameter int BANK_DEPTH          = 16384,
   parameter int STREAM_OFFSET_WIDTH = 10,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
@@ -65,7 +66,6 @@ module dma_top #(
   // #######
   // Control
 
-  logic                       cfg_dma_enable; 
   logic                       cfg_egress_enable; 
   logic [DATA_WIDTH-1:0]      cfg_l2_bank_base;
   logic [N_STREAMS-1:0]       cfg_stream_en;
@@ -96,7 +96,7 @@ module dma_top #(
     .pready_o(pready_o),
     .pslverr_o(pslverr_o),
 
-    .dma_enable_o(cfg_dma_enable),
+    .dma_enable_o(perf_dma_enable_o),
     .egress_enable_o(cfg_egress_enable),
     .l2_bank_base_o(cfg_l2_bank_base),
 
@@ -201,7 +201,9 @@ module dma_top #(
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
     .W_WORKERS(W_WORKERS),
-    .B_BANKS(B_BANKS)
+    .B_BANKS(B_BANKS),
+    .MACRO_DEPTH(MACRO_DEPTH),
+    .BANK_DEPTH(BANK_DEPTH)
   ) u_egress_top (
     .clk_i(clk_i),
     .rst_ni(rst_ni),

@@ -60,6 +60,11 @@ module address_generator #(
     MODE_STRIDED = 4'h1
   } agu_mode_e;
 
+  typedef struct packed {
+    logic [ADDR_WIDTH-1:0]      addr;
+    logic [MACRO_PTR_WIDTH-1:0] macro_sel;
+  } bp_payload_t;
+
   state_e state_q, state_d;
 
   logic [STREAM_PTR_WIDTH-1:0] stream_id_q,      stream_id_d;
@@ -73,8 +78,8 @@ module address_generator #(
   logic [ADDR_WIDTH-1:0]      bus_cnt_q,      bus_cnt_d;
 
   logic [MACRO_CNT_WIDTH-1:0] num_macros_needed_q, num_macros_needed_d;
-  logic [MACRO_PTR_WIDTH-1:0] macro_table_q [M_MACROS/2]; 
-  logic [MACRO_PTR_WIDTH-1:0] macro_table_d [M_MACROS/2];
+  logic [MACRO_PTR_WIDTH-1:0] macro_table_q [M_MACROS/2],
+                              macro_table_d [M_MACROS/2];
   logic [MACRO_CNT_WIDTH-1:0] prep_cnt_q,   prep_cnt_d;
   logic [M_MACROS-1:0]        macro_mask_q, macro_mask_d;
 
@@ -84,17 +89,42 @@ module address_generator #(
   logic                  fifo_empty;
   logic                  pipeline_full;
 
+  bp_payload_t us_payload;
+  bp_payload_t ds_payload;
+  logic        skid_ready;
+
   assign pipeline_full     = ((req_cnt_q - bus_cnt_q) >= 4);
   assign can_issue_req     = (state_q == RUN) && 
                              !pipeline_full &&
                              (req_cnt_q < window_size_q);
 
-  assign bp_addr_o         = current_addr[OFFSET_WIDTH-1:0] * DATA_WIDTH_BYTES;
-  assign bp_macro_sel_o    = macro_table_q[current_addr >> OFFSET_WIDTH];
-  assign bp_req_o          = can_issue_req;
+  //assign bp_addr_o         = current_addr[OFFSET_WIDTH-1:0] * DATA_WIDTH_BYTES;
+  //assign bp_macro_sel_o    = macro_table_q[current_addr >> OFFSET_WIDTH];
+  //assign bp_req_o          = can_issue_req;
 
   assign bus_valid_o       = !fifo_empty;
   assign bus_addr_o        = base_addr_q + (bus_cnt_q * DATA_WIDTH_BYTES);
+
+  assign us_payload.addr      = current_addr[OFFSET_WIDTH-1:0] * DATA_WIDTH_BYTES;
+  assign us_payload.macro_sel = macro_table_q[current_addr >> OFFSET_WIDTH];
+
+  skid_buffer #(
+    .DATA_WIDTH($bits(bp_payload_t))
+  ) u_bp_skid_buffer (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+
+    .us_valid_i(can_issue_req),
+    .us_data_i(us_payload),
+    .us_ready_o(skid_ready),
+
+    .ds_ready_i(bp_gnt_i),
+    .ds_valid_o(bp_req_o),
+    .ds_data_o(ds_payload)
+  );
+
+  assign bp_addr_o      = ds_payload.addr;
+  assign bp_macro_sel_o = ds_payload.macro_sel;
 
   // Meta IF
   always_comb begin
@@ -173,7 +203,8 @@ module address_generator #(
       RUN: begin
         job_start = 1'b0;
         // Prefetch BP 
-        if (can_issue_req && bp_gnt_i) begin
+        //if (can_issue_req && bp_gnt_i) begin
+        if (can_issue_req && skid_ready) begin
           req_cnt_d = req_cnt_q + 1;
         end
 
@@ -206,7 +237,13 @@ module address_generator #(
   logic [NUM_MODES-1:0]  req_all;
 
   assign addr_all[MODE_LINEAR] = req_cnt_q;
-  assign req_all               = NUM_MODES'(can_issue_req && bp_gnt_i) << agu_mode_q;
+  //assign req_all               = NUM_MODES'(can_issue_req && bp_gnt_i) << agu_mode_q;
+  assign req_all               = NUM_MODES'(can_issue_req && skid_ready) << agu_mode_q;
+
+  logic [95:0] strided_payload_in;
+  assign strided_payload_in = (state_q == IDLE && sel_i && job_assign_i.valid) 
+                              ? job_assign_i.pkt.payload 
+                              : payload_q;
 
   strided_addr_gen #(
     .ADDR_WIDTH(ADDR_WIDTH)
@@ -216,7 +253,7 @@ module address_generator #(
     .job_start_i(job_start),
     .req_i(req_all[MODE_STRIDED]),
     .base_addr_i('0),
-    .payload_i(payload_q),
+    .payload_i(strided_payload_in),
     .addr_o(addr_all[MODE_STRIDED])
   );  
 

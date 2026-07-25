@@ -110,7 +110,8 @@ module l2_subsystem #(
   );
 
   l2_sram_macro #(
-    .B_BANKS(B_BANKS)
+    .B_BANKS(B_BANKS),
+    .BANK_DEPTH(BANK_DEPTH)
   ) u_sram (
     .clk_i(clk_i),
     .rst_ni(rst_ni),

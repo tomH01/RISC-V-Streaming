@@ -102,22 +102,24 @@ module buffer_pool #(
       assign demux_gnt[i]  = (macro_owner_q[i] == 1'b0) ? macro_gnt[i] : 1'b0;
       assign ingr_gnt_o[i] = demux_gnt[i]; 
 
-      buffer_sram_macro u_macro (
+      buffer_sram_macro #(
+        .MACRO_DEPTH(MACRO_DEPTH)
+      ) u_macro (
         .clk_i(clk_i),
         .rst_ni(rst_ni),
 
-        .req(mux_req[i]),
-        .add(mux_addr[i]),
+        .req_i(mux_req[i]),
+        .addr_i(mux_addr[i]),
 
-        .gnt(macro_gnt[i]),
+        .gnt_o(macro_gnt[i]),
 
-        .wen(macro_owner_q[i]),
-        .be(macro_be[i]),
+        .wen_i(macro_owner_q[i]),
+        .be_i(macro_be[i]),
         
-        .wdata(ingr_wdata_i[i]),
+        .wdata_i(ingr_wdata_i[i]),
 
-        .r_rdata(macro_r_rdata[i]),
-        .r_valid(macro_r_valid[i])    
+        .r_rdata_o(macro_r_rdata[i]),
+        .r_valid_o(macro_r_valid[i])    
       );
     end 
   endgenerate
