@@ -35,7 +35,6 @@ module egress_top #(
   input logic                   enable_i,
   input logic  [DATA_WIDTH-1:0] l2_bank_base_i,
 
-  input logic [N_STREAMS-1:0]       stream_en_i,
   input logic [ADDR_WIDTH-1:0]      window_size_i  [N_STREAMS],
   input logic [MACRO_PTR_WIDTH-1:0] start_macro_i  [N_STREAMS],
   input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],

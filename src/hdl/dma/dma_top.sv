@@ -221,8 +221,7 @@ module dma_top #(
 
     .enable_i(cfg_egress_enable),
     .l2_bank_base_i(cfg_l2_bank_base),
-
-    .stream_en_i(cfg_stream_en),
+    
     .window_size_i(cfg_window_size),
     .start_macro_i(cfg_start_macro),
     .next_pointer_i(cfg_next_pointer),
