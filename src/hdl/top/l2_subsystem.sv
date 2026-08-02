@@ -16,14 +16,15 @@ module l2_subsystem #(
   input  logic [ADDR_WIDTH-1:0]   dma_addr_i  [DMA_MANAGERS],
   input  logic [DATA_WIDTH-1:0]   dma_wdata_i [DMA_MANAGERS],
 
-  output logic                    cpu_ready_o,
-  input  logic                    cpu_valid_i,
-  input  logic [ADDR_WIDTH-1:0]   cpu_addr_i,
-  input  logic [DATA_WIDTH-1:0]   cpu_wdata_i,
-  input  logic                    cpu_wen_i,
+  output logic                        cpu_ready_o,
+  input  logic                        cpu_valid_i,
+  input  logic [ADDR_WIDTH-1:0]       cpu_addr_i,
+  input  logic [DATA_WIDTH-1:0]       cpu_wdata_i,
+  input  logic [DATA_WIDTH_BYTES-1:0] cpu_be_i,
+  input  logic                        cpu_wen_i,
 
-  output logic [DATA_WIDTH-1:0]   cpu_r_rdata_o,
-  output logic                    cpu_r_valid_o,
+  output logic [DATA_WIDTH-1:0] cpu_r_rdata_o,
+  output logic                  cpu_r_valid_o,
 
   output logic                        meta_req_o,
   output logic [ADDR_WIDTH-1:0]       meta_addr_o,
@@ -50,15 +51,10 @@ module l2_subsystem #(
   logic [DMA_MANAGERS-1:0]     dma_wen_static;
   logic [DATA_WIDTH_BYTES-1:0] dma_be_static    [DMA_MANAGERS];
 
-  logic [DATA_WIDTH_BYTES-1:0] cpu_be_static;
-
-
   always_comb begin
     // 0 = write, 1 = read
     dma_wen_static    = '0;
     dma_be_static     = '{default: '1};
-    
-    cpu_be_static     = '1;
   end
 
   sram_interconnect #(
@@ -85,7 +81,7 @@ module l2_subsystem #(
     .cpu_addr_i(cpu_addr_i),
     .cpu_wen_i(cpu_wen_i),
     .cpu_wdata_i(cpu_wdata_i),
-    .cpu_be_i(cpu_be_static),
+    .cpu_be_i(cpu_be_i),
 
     .cpu_r_rdata_o(cpu_r_rdata_o),
     .cpu_r_valid_o(cpu_r_valid_o),

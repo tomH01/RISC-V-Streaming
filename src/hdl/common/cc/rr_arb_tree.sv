@@ -14,9 +14,8 @@
 // Description: logarithmic arbitration tree with round robin arbitration scheme.
 
 `include "common_cells/assertions.svh"
-`include "common_cells/registers.svh"
 
-/// The cc_rr_arb_tree employs non-starving round robin-arbitration - i.e., the priorities
+/// The rr_arb_tree employs non-starving round robin-arbitration - i.e., the priorities
 /// rotate each cycle.
 ///
 /// ## Fair vs. unfair Arbitration
@@ -31,29 +30,29 @@
 ///           state being calculated without the context of the active request. Leading to an
 ///           unfair throughput distribution if not all inputs have active requests.
 /// * `1'b1`: The next state jumps to the next unserved request with higher index.
-///           This is achieved by using two trailing-zero-counters (`cc_lzc`). The upper has the masked
+///           This is achieved by using two trailing-zero-counters (`lzc`). The upper has the masked
 ///           `req_i` signal with all indices which will have a higher priority in the next state.
 ///           The trailing zero count defines the input index with the next highest priority after
-///           the current one is served. When the upper is empty the lower `cc_lzc` provides the
+///           the current one is served. When the upper is empty the lower `lzc` provides the
 ///           wrapped index if there are outstanding requests with lower or same priority.
 /// The implication of throughput fairness on the module timing are:
-/// * The trailing zero counter (`cc_lzc`) has a loglog relation of input to output timing. This means
+/// * The trailing zero counter (`lzc`) has a loglog relation of input to output timing. This means
 ///   that in this module the input to register path scales with Log(Log(`NumIn`)).
-/// * The `cc_rr_arb_tree` data multiplexing scales with Log(`NumIn`). This means that the input to output
+/// * The `rr_arb_tree` data multiplexing scales with Log(`NumIn`). This means that the input to output
 ///   timing path of this module also scales scales with Log(`NumIn`).
 /// This implies that in this module the input to output path is always longer than the input to
 /// register path. As the output data usually also terminates in a register the parameter `FairArb`
 /// only has implications on the area. When it is `1'b0` a static plus one adder is instantiated.
-/// If it is `1'b1` two `cc_lzc`, a masking logic stage and a two input multiplexer are instantiated.
+/// If it is `1'b1` two `lzc`, a masking logic stage and a two input multiplexer are instantiated.
 /// However these are small in respect of the data multiplexers needed, as the width of the `req_i`
 /// signal is usually less as than `DataWidth`.
-module cc_rr_arb_tree #(
+module rr_arb_tree #(
   /// Number of inputs to be arbitrated.
   parameter int unsigned NumIn      = 64,
-  /// Data width of the payload in bits. Not needed if `data_t` is overwritten.
+  /// Data width of the payload in bits. Not needed if `DataType` is overwritten.
   parameter int unsigned DataWidth  = 32,
   /// Data type of the payload, can be overwritten with custom type. Only use of `DataWidth`.
-  parameter type         data_t     = logic [DataWidth-1:0],
+  parameter type         DataType   = logic [DataWidth-1:0],
   /// The `ExtPrio` option allows to override the internal round robin counter via the
   /// `rr_i` signal. This can be useful in case multiple arbiters need to have
   /// rotating priorities that are operating in lock-step. If static priority arbitration
@@ -81,31 +80,33 @@ module cc_rr_arb_tree #(
   parameter bit          FairArb    = 1'b1,
   /// Dependent parameter, do **not** overwrite.
   /// Width of the arbitration priority signal and the arbitrated index.
-  localparam int unsigned IdxWidth   = (NumIn > 32'd1) ? unsigned'($clog2(NumIn)) : 32'd1,
+  parameter int unsigned IdxWidth   = (NumIn > 32'd1) ? unsigned'($clog2(NumIn)) : 32'd1,
   /// Dependent parameter, do **not** overwrite.
   /// Type for defining the arbitration priority and arbitrated index signal.
-  localparam type         idx_t      = logic [IdxWidth-1:0]
+  parameter type         idx_t      = logic [IdxWidth-1:0]
 ) (
   /// Clock, positive edge triggered.
   input  logic                clk_i,
-  /// Asynchronous reset active low.
+  /// Asynchronous reset, active low.
   input  logic                rst_ni,
-  /// Synchronous clear active high.
-  input  logic                clr_i,
+  /// Clears the arbiter state. Only used if `ExtPrio` is `1'b0` or `LockIn` is `1'b1`.
+  input  logic                flush_i,
   /// External round-robin priority. Only used if `ExtPrio` is `1'b1.`
   input  idx_t                rr_i,
   /// Input requests arbitration.
   input  logic    [NumIn-1:0] req_i,
+  /* verilator lint_off UNOPTFLAT */
   /// Input request is granted.
   output logic    [NumIn-1:0] gnt_o,
+  /* verilator lint_on UNOPTFLAT */
   /// Input data for arbitration.
-  input  data_t   [NumIn-1:0] data_i,
+  input  DataType [NumIn-1:0] data_i,
   /// Output request is valid.
   output logic                req_o,
   /// Output request is granted.
   input  logic                gnt_i,
   /// Output data.
-  output data_t               data_o,
+  output DataType             data_o,
   /// Index from which input the data came from.
   output idx_t                idx_o
 );
@@ -113,17 +114,19 @@ module cc_rr_arb_tree #(
   // just pass through in this corner case
   if (NumIn == unsigned'(1)) begin : gen_pass_through
     assign req_o    = req_i[0];
-    assign gnt_o[0] = gnt_i & (AxiVldRdy | req_i[0]);
+    assign gnt_o[0] = gnt_i;
     assign data_o   = data_i[0];
     assign idx_o    = '0;
   // non-degenerate cases
   end else begin : gen_arbiter
     localparam int unsigned NumLevels = unsigned'($clog2(NumIn));
 
+    /* verilator lint_off SPLITVAR */  // disable warning that is issued if bitwidth is 1
     idx_t    [2**NumLevels-2:0] index_nodes /* verilator split_var */; // propagates indices
-    data_t   [2**NumLevels-2:0] data_nodes  /* verilator split_var */; // propagates data
+    DataType [2**NumLevels-2:0] data_nodes  /* verilator split_var */; // propagates data
     logic    [2**NumLevels-2:0] gnt_nodes   /* verilator split_var */; // propagates gnt to masters
     logic    [2**NumLevels-2:0] req_nodes   /* verilator split_var */; // propagates reqs to slave
+    /* verilator lint_on SPLITVAR */
 
     /* lint_off */
     idx_t                       rr_q;
@@ -148,20 +151,40 @@ module cc_rr_arb_tree #(
         assign lock_d     = req_o & ~gnt_i;
         assign req_d      = (lock_q) ? req_q : req_i;
 
-        `FFARNC(lock_q, lock_d, clr_i, '0, clk_i, rst_ni)
+        always_ff @(posedge clk_i or negedge rst_ni) begin : p_lock_reg
+          if (!rst_ni) begin
+            lock_q <= '0;
+          end else begin
+            if (flush_i) begin
+              lock_q <= '0;
+            end else begin
+              lock_q <= lock_d;
+            end
+          end
+        end
 
         `ifndef COMMON_CELLS_ASSERTS_OFF
-          `ASSERT(lock, req_o && !gnt_i |=> idx_o == $past(idx_o),
-                  clk_i, !rst_ni || clr_i,
+          `ASSERT(lock, req_o && (!gnt_i && !flush_i) |=> idx_o == $past(idx_o),
+                  clk_i, !rst_ni || flush_i,
                   "Lock implies same arbiter decision in next cycle if output is not ready.")
 
           logic [NumIn-1:0] req_tmp;
           assign req_tmp = req_q & req_i;
-          `ASSUME(lock_req, lock_d |=> req_tmp == req_q, clk_i, !rst_ni || clr_i,
+          `ASSUME(lock_req, lock_d |=> req_tmp == req_q, clk_i, !rst_ni || flush_i,
                   "It is disallowed to deassert unserved request signals when LockIn is enabled.")
         `endif
 
-        `FFARNC(req_q, req_d, clr_i, '0, clk_i, rst_ni)
+        always_ff @(posedge clk_i or negedge rst_ni) begin : p_req_regs
+          if (!rst_ni) begin
+            req_q  <= '0;
+          end else begin
+            if (flush_i) begin
+              req_q  <= '0;
+            end else begin
+              req_q  <= req_d;
+            end
+          end
+        end
       end else begin : gen_no_lock
         assign req_d = req_i;
       end
@@ -172,27 +195,22 @@ module cc_rr_arb_tree #(
         logic             upper_empty, lower_empty;
 
         for (genvar i = 0; i < NumIn; i++) begin : gen_mask
-          if (i == 0) begin : gen_first_mask
-            assign upper_mask[i] = 1'b0;
-            assign lower_mask[i] = req_d[i];
-          end else begin : gen_other_mask
-            assign upper_mask[i] = (idx_t'(i) >  rr_q) ? req_d[i] : 1'b0;
-            assign lower_mask[i] = (idx_t'(i) <= rr_q) ? req_d[i] : 1'b0;
-          end
+          assign upper_mask[i] = (i >  rr_q) ? req_d[i] : 1'b0;
+          assign lower_mask[i] = (i <= rr_q) ? req_d[i] : 1'b0;
         end
 
-        cc_lzc #(
-          .Width ( NumIn ),
-          .Mode  ( cc_pkg::LZC_TRAILING_ZERO_CNT )
+        lzc #(
+          .WIDTH ( NumIn ),
+          .MODE  ( 1'b0  )
         ) i_lzc_upper (
           .in_i    ( upper_mask  ),
           .cnt_o   ( upper_idx   ),
           .empty_o ( upper_empty )
         );
 
-        cc_lzc #(
-          .Width ( NumIn ),
-          .Mode  ( cc_pkg::LZC_TRAILING_ZERO_CNT )
+        lzc #(
+          .WIDTH ( NumIn ),
+          .MODE  ( 1'b0  )
         ) i_lzc_lower (
           .in_i    ( lower_mask  ),
           .cnt_o   ( lower_idx   ),
@@ -207,7 +225,17 @@ module cc_rr_arb_tree #(
       end
 
       // this holds the highest priority
-      `FFARNC(rr_q, rr_d, clr_i, '0, clk_i, rst_ni)
+      always_ff @(posedge clk_i or negedge rst_ni) begin : p_rr_regs
+        if (!rst_ni) begin
+          rr_q   <= '0;
+        end else begin
+          if (flush_i) begin
+            rr_q   <= '0;
+          end else begin
+            rr_q   <= rr_d;
+          end
+        end
+      end
     end
 
     assign gnt_nodes[0] = gnt_i;
@@ -246,7 +274,7 @@ module cc_rr_arb_tree #(
           if (unsigned'(l) * 2 > NumIn-1) begin : gen_out_of_range
             assign req_nodes[Idx0]   = 1'b0;
             assign index_nodes[Idx0] = idx_t'('0);
-            assign data_nodes[Idx0]  = data_t'('0);
+            assign data_nodes[Idx0]  = DataType'('0);
           end
         //////////////////////////////////////////////////////////////
         // general case for other levels within the tree
@@ -273,21 +301,21 @@ module cc_rr_arb_tree #(
     `ASSERT_INIT(lockin_and_extprio, !(LockIn && ExtPrio),
                  "Cannot use LockIn feature together with external ExtPrio.")
 
-    `ASSERT(hot_one, $onehot0(gnt_o), clk_i, !rst_ni || clr_i,
+    `ASSERT(hot_one, $onehot0(gnt_o), clk_i, !rst_ni || flush_i,
             "Grant signal must be hot1 or zero.")
 
-    `ASSERT(gnt0, |gnt_o |-> gnt_i, clk_i, !rst_ni || clr_i, "Grant out implies grant in.")
+    `ASSERT(gnt0, |gnt_o |-> gnt_i, clk_i, !rst_ni || flush_i, "Grant out implies grant in.")
 
-    `ASSERT(gnt1, req_o |-> gnt_i |-> |gnt_o, clk_i, !rst_ni || clr_i,
+    `ASSERT(gnt1, req_o |-> gnt_i |-> |gnt_o, clk_i, !rst_ni || flush_i,
             "Req out and grant in implies grant out.")
 
-    `ASSERT(gnt_idx, req_o |->  gnt_i |-> gnt_o[idx_o], clk_i, !rst_ni || clr_i,
+    `ASSERT(gnt_idx, req_o |->  gnt_i |-> gnt_o[idx_o], clk_i, !rst_ni || flush_i,
             "Idx_o / gnt_o do not match.")
 
-    `ASSERT(req0, |req_i |-> req_o, clk_i, !rst_ni || clr_i, "Req in implies req out.")
+    `ASSERT(req0, |req_i |-> req_o, clk_i, !rst_ni || flush_i, "Req in implies req out.")
 
-    `ASSERT(req1, req_o |-> |req_i, clk_i, !rst_ni || clr_i, "Req out implies req in.")
+    `ASSERT(req1, req_o |-> |req_i, clk_i, !rst_ni || flush_i, "Req out implies req in.")
     `endif
   end
 
-endmodule : cc_rr_arb_tree
+endmodule : rr_arb_tree

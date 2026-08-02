@@ -11,7 +11,7 @@ from cocotb.clock import Clock
 
 from utils.python.cocotb import get_design_parameters
 
-from apb_driver import APBDriver
+from bus_drivers import APBDriver
 params = get_design_parameters()
 
 
@@ -75,7 +75,7 @@ class PerformanceMonitorDriver:
         self.dut.cpu_meta_gnt_i.value = rnd.randint(0, 1)
     
     async def read_word_offset(self, word_offset):
-        BASE_ADDR = 0x08004000
+        BASE_ADDR = 0x48004000
         
         addr = BASE_ADDR + word_offset * 4
         return await self.apb_driver.apb_read(addr)

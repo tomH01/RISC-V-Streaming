@@ -5,6 +5,7 @@ module l2_allocator_wrapper #(
   parameter int ADDR_WIDTH    = 32,
   parameter int W_WORKERS     = 2,
   parameter int B_BANKS       = 2,
+  parameter int BANK_DEPTH    = 8192,
 
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
   localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
@@ -84,7 +85,8 @@ module l2_allocator_wrapper #(
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
     .W_WORKERS(W_WORKERS),
-    .B_BANKS(B_BANKS)
+    .B_BANKS(B_BANKS),
+    .BANK_DEPTH(BANK_DEPTH)
   ) dut (
     .clk_i(clk_i),
     .rst_ni(rst_ni),

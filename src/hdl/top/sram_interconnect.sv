@@ -77,7 +77,7 @@ module sram_interconnect #(
   logic      [NUM_SUBORDINATES-1:0]                        xbar_ready_in;
 
   logic  cpu_to_meta_req;
-  assign cpu_to_meta_req = cpu_valid_i && (cpu_addr_i >= 32'h0010_0000);
+  assign cpu_to_meta_req = cpu_valid_i && (cpu_addr_i[20] == 1'b1);
 
   // Input Mapping
   always_comb begin
@@ -121,7 +121,7 @@ module sram_interconnect #(
     end 
   end
 
-  cc_stream_xbar #(
+  stream_xbar #(
     .NumInp(NUM_MANAGERS),
     .NumOut(NUM_SUBORDINATES),
     .DataWidth(DATA_WIDTH),
@@ -133,8 +133,7 @@ module sram_interconnect #(
   ) u_xbar (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
-    .clr_i(1'b0),
-    .clr_arb_i(1'b0),
+    .flush_i(1'b0),
     .rr_i('0),
 
     .data_i(xbar_din),

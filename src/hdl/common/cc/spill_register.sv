@@ -14,28 +14,26 @@
 
 /// Wrapper around the flushable spill register to maintain back-ward
 /// compatibility.
-module cc_spill_register #(
-  parameter type data_t = logic,
+module spill_register #(
+  parameter type T      = logic,
   parameter bit  Bypass = 1'b0     // make this spill register transparent
 ) (
-  input  logic  clk_i   , // Clock
-  input  logic  rst_ni  , // Asynchronous reset active low
-  input  logic  clr_i   , // Synchronous clear active high
-  input  logic  valid_i ,
-  output logic  ready_o ,
-  input  data_t data_i  ,
-  output logic  valid_o ,
-  input  logic  ready_i ,
-  output data_t data_o
+  input  logic clk_i   ,
+  input  logic rst_ni  ,
+  input  logic valid_i ,
+  output logic ready_o ,
+  input  T     data_i  ,
+  output logic valid_o ,
+  input  logic ready_i ,
+  output T     data_o
 );
 
-  cc_spill_register_flushable #(
-    .data_t(data_t),
+  spill_register_flushable #(
+    .T(T),
     .Bypass(Bypass)
   ) spill_register_flushable_i (
     .clk_i,
     .rst_ni,
-    .clr_i,
     .valid_i,
     .flush_i(1'b0),
     .ready_o,

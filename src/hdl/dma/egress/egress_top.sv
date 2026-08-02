@@ -96,6 +96,8 @@ module egress_top #(
     .ADDR_WIDTH(ADDR_WIDTH)
   ) u_job_assign_if();
 
+  assign u_job_assign_if.ready = 1'b1;
+
   // ############
   // Job Manager
 

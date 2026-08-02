@@ -74,7 +74,7 @@ module control #(
   assign is_topology        = (paddr_i[15:12] == 4'h2);
   assign is_stream_interval = (paddr_i[15:12] == 4'h3);
   assign is_perf_mon        = (paddr_i[15:12] == 4'h4);
-
+(* keep = "true" *)
   logic wr_en;
   assign pready_o  = is_apb_space & !is_perf_mon & psel_i & penable_i;
   assign wr_en     = pready_o & pwrite_i;

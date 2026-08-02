@@ -10,66 +10,28 @@ from cocotb.triggers import ClockCycles, Edge, RisingEdge, FallingEdge, ReadOnly
 from cocotb.clock import Clock
 
 from config_randomizer import ConfigRandomizer
+
 from control_driver import ControlDriver
+from base_driver import BaseDriver
+from dma_driver import DMADriver
 
 from utils.python.cocotb import get_design_parameters
 
 params = get_design_parameters()
 
 
-class TopDriver:
+class TopDriver(BaseDriver):
     def __init__(self, dut):
         self.dut = dut
         
-        self.n_streams = int(params["N_STREAMS"])
-        self.w_workers = int(params["W_WORKERS"])
-        self.m_macros = int(params["M_MACROS"])
-        
-        self.ctrl_driver = ControlDriver(dut)
+        self.ctrl_driver = ControlDriver(dut, driver_protocol="apb")
+        self.dma_driver = DMADriver(dut, self.ctrl_driver)
         
         self._init_signals()
         
     def _init_signals(self):
-        self.dut.cpu_valid_i.value = 0
-        self.dut.cpu_addr_i.value = 0
-        
-    async def reset(self):
-        self.dut.rst_ni.value = 0
-        await RisingEdge(self.dut.clk_i)
-        await RisingEdge(self.dut.clk_i)
-        self.dut.rst_ni.value = 1
-        await RisingEdge(self.dut.clk_i)
-        
-    async def setup_ingress_cfg(self, configs, topology):
-        await self._send_topology_cfg(topology)
-        
-        for stream_id, cfg in configs.items():
-            await self._send_stream_cfg(stream_id, cfg)
-            
-    async def setup_global_cfg(self, bank_base):
-        await self.ctrl_driver.send_global_config("bank_base", bank_base)
-        await RisingEdge(self.dut.clk_i)
-        await self.ctrl_driver.send_global_config("egress_enable", self.ctrl_driver.get_enable(True))   
-            
-    async def activate_streams(self, configs):
-        for stream_id in configs.keys():
-            await self._activate_stream(stream_id)     
-            
-    async def send_egress_cfg(self, stream_id, idx, cfg):
-        pass
-            
-        
-    async def _send_stream_cfg(self, stream_id, cfg):
-        await self.ctrl_driver.send_ingress_config("start_macro", cfg["start_macro"], stream_id)
-        await self.ctrl_driver.send_ingress_config("window_size", 100, stream_id) #cfg["window_size"], stream_id)
-        await self.ctrl_driver.send_stream_interval(stream_id, 1) #cfg["interval"])
-        
-    async def _send_topology_cfg(self, topology):
-        for i in range(0, self.m_macros, 2):
-            await self.ctrl_driver.send_topology_pair(i, topology)
-        
-    async def _activate_stream(self, stream_id):
-        await self.ctrl_driver.send_ingress_config("stream_en", 1, stream_id)    
+        self.dut.data_req_i.value = 0
+        self.dut.data_addr_i.value = 0  
 
 @cocotb.test()
 async def test_dma_top(dut):
@@ -90,12 +52,12 @@ async def test_dma_top(dut):
     for i in range(1):
         configs, topology = config_randomizer.generate_configs(verbose=True)
         
-        await driver.setup_ingress_cfg(configs, topology)        
+        await driver.dma_driver.setup_ingress_cfg(configs, topology)        
         
         bank_base = 0
-        await driver.setup_global_cfg(bank_base)
+        await driver.dma_driver.setup_global_cfg(bank_base)
         
-        await driver.activate_streams(configs)
+        await driver.dma_driver.activate_streams(configs)
         
         NUM_WINDOWS = 100
         MAX_CYCLES = 3001

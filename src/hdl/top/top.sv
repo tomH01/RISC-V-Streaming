@@ -16,7 +16,6 @@ module top #(
 )(
   input logic clk_i,
   input logic rst_ni,
-
   // APB Subordinate IF
   input logic                   penable_i,
   input logic                   pwrite_i,
@@ -27,16 +26,18 @@ module top #(
   output logic                  pready_o,
   output logic                  pslverr_o,
 
-  // CPU IF
-  output logic                    cpu_ready_o,
-  input  logic                    cpu_valid_i,
-  input  logic [ADDR_WIDTH-1:0]   cpu_addr_i,
-  input  logic [DATA_WIDTH-1:0]   cpu_wdata_i,
-  input  logic                    cpu_wen_i,
+  // Data IF
+  input  logic                        data_req_i,
+  output logic                        data_gnt_o,
+  input  logic [ADDR_WIDTH-1:0]       data_addr_i,
+  input  logic [DATA_WIDTH-1:0]       data_wdata_i,
+  input  logic [DATA_WIDTH_BYTES-1:0] data_be_i,
+  input  logic                        data_we_i,
 
-  output logic [DATA_WIDTH-1:0]   cpu_r_rdata_o,
-  output logic                    cpu_r_valid_o,
+  output logic [DATA_WIDTH-1:0] data_r_rdata_o,
+  output logic                  data_r_valid_o,
 
+  // Job dispatched IRQ
   output logic job_dispatched_o
 );
 
@@ -84,15 +85,15 @@ module top #(
   logic [W_WORKERS-1:0] perf_egr_wkr_bp_gnt;
   logic [W_WORKERS-1:0] perf_egr_wkr_bus_valid;
   logic [W_WORKERS-1:0] perf_egr_wkr_bus_ready;
-  logic                 perf_cpu_l2_valid;
-  logic                 perf_cpu_l2_ready;
-  logic                 perf_cpu_meta_req;
-  logic                 perf_cpu_meta_gnt;
+  logic                 perf_data_l2_valid;
+  logic                 perf_data_l2_ready;
+  logic                 perf_data_meta_req;
+  logic                 perf_data_meta_gnt;
 
-  assign perf_cpu_l2_valid = cpu_valid_i;
-  assign perf_cpu_l2_ready = cpu_ready_o;
-  assign perf_cpu_meta_req = meta_req;
-  assign perf_cpu_meta_gnt = meta_gnt;
+  assign perf_data_l2_valid = data_req_i;
+  assign perf_data_l2_ready = data_gnt_o;
+  assign perf_data_meta_req = meta_req;
+  assign perf_data_meta_gnt = meta_gnt;
 
   dma_top #(
     .N_STREAMS(N_STREAMS),
@@ -150,6 +151,9 @@ module top #(
 
   // L2 Subsystem
 
+  logic internal_wen;
+  assign internal_wen = ~data_we_i;
+
   l2_subsystem #(
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
@@ -165,14 +169,15 @@ module top #(
     .dma_addr_i(dma_addr),
     .dma_wdata_i(dma_wdata),
 
-    .cpu_ready_o(cpu_ready_o),
-    .cpu_valid_i(cpu_valid_i),
-    .cpu_addr_i(cpu_addr_i),
-    .cpu_wdata_i(cpu_wdata_i),
-    .cpu_wen_i(cpu_wen_i),
+    .cpu_ready_o(data_gnt_o),
+    .cpu_valid_i(data_req_i),
+    .cpu_addr_i(data_addr_i),
+    .cpu_wdata_i(data_wdata_i),
+    .cpu_be_i(data_be_i),
+    .cpu_wen_i(internal_wen),
 
-    .cpu_r_rdata_o(cpu_r_rdata_o),
-    .cpu_r_valid_o(cpu_r_valid_o),
+    .cpu_r_rdata_o(data_r_rdata_o),
+    .cpu_r_valid_o(data_r_valid_o),
 
     .meta_req_o(meta_req),
     .meta_addr_o(meta_addr),
@@ -219,10 +224,10 @@ module top #(
     .egr_wkr_bus_valid_i(perf_egr_wkr_bus_valid),
     .egr_wkr_bus_ready_i(perf_egr_wkr_bus_ready),
 
-    .cpu_l2_valid_i(perf_cpu_l2_valid),
-    .cpu_l2_ready_i(perf_cpu_l2_ready),
-    .cpu_meta_req_i(perf_cpu_meta_req),
-    .cpu_meta_gnt_i(perf_cpu_meta_gnt)
+    .cpu_l2_valid_i(perf_data_l2_valid),
+    .cpu_l2_ready_i(perf_data_l2_ready),
+    .cpu_meta_req_i(perf_data_meta_req),
+    .cpu_meta_gnt_i(perf_data_meta_gnt)
   );
 
 endmodule

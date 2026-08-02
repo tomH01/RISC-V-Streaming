@@ -11,7 +11,10 @@ set global_sim_files [list \
 ]
 
 set tools [list \
-  "src/test/tools/apb_driver.py" \
+  "src/test/tools/axi_driver.py" \
+  "src/test/tools/bus_drivers.py" \
+  "src/test/tools/base_driver.py" \
+  "src/test/tools/dma_driver.py" \
   "src/test/tools/addr_generator_models.py" \
   "src/test/tools/config_randomizer.py" \
   "src/test/tools/control_driver.py" \
@@ -50,18 +53,39 @@ set dma_hdl [concat \
   ] 
 ]
 
-set xbar [list \
-  "src/hdl/common/interconnect/cc_pkg.sv" \
-  "src/hdl/common/interconnect/cc_lzc.sv" \
-  "src/hdl/common/interconnect/cc_rr_arb_tree.sv" \
-  "src/hdl/common/interconnect/cc_spill_register.sv" \
-  "src/hdl/common/interconnect/cc_spill_register_flushable.sv" \
-  "src/hdl/common/interconnect/cc_stream_demux.sv" \
-  "src/hdl/common/interconnect/cc_stream_xbar.sv" \
+set cc [list \
+  "src/hdl/common/cc/cf_math_pkg.sv" \
+  "src/hdl/common/cc/lzc.sv" \
+  "src/hdl/common/cc/addr_decode.sv" \
+  "src/hdl/common/cc/addr_decode_dync.sv" \
+  "src/hdl/common/cc/rr_arb_tree.sv" \
+  "src/hdl/common/cc/spill_register.sv" \
+  "src/hdl/common/cc/spill_register_flushable.sv" \
+  "src/hdl/common/cc/fifo_v3.sv" \
+  "src/hdl/common/cc/fall_through_register.sv" \
+  "src/hdl/common/cc/stream_fifo.sv" \
+  "src/hdl/common/cc/stream_join.sv" \
+  "src/hdl/common/cc/stream_join_dynamic.sv" \
+  "src/hdl/common/cc/stream_fork.sv" \
+  "src/hdl/common/cc/stream_fork_dynamic.sv" \
+  "src/hdl/common/cc/stream_mux.sv" \
+  "src/hdl/common/cc/stream_demux.sv" \
+  "src/hdl/common/cc/stream_xbar.sv" \
+]
+
+set axi [list \
+  "src/hdl/common/axi/axi_pkg.sv" \
+  "src/hdl/common/axi/axi_lite_to_apb.sv" \
+  "src/hdl/common/axi/axi_to_detailed_mem.sv" \
+  "src/hdl/common/axi/axi_to_mem.sv" \
+]
+
+set apb [list \
+  "src/hdl/common/apb/apb_pkg.sv" \
 ]
 
 set l2_subsystem_hdl [concat \
-  $xbar \
+  $cc \
   [list \
     "src/hdl/memory/l2_sram_macro.sv" \
     "src/hdl/top/sram_interconnect.sv" \
@@ -297,7 +321,7 @@ $stream_generator addPythonSimFiles [concat $global_sim_files [list \
 set top [EDA::Design::createComponent top]
 
 $top addHDLSourceFiles [concat \
-  $xbar \
+  $cc \
   $dma_hdl \
   $l2_subsystem_hdl \
   [list \
@@ -338,6 +362,29 @@ $performance_monitor addPythonSimFiles [concat $global_sim_files $tools [list \
   "src/test/top/test_performance_monitor.py" \
 ]]
 
+
+set top_axi_wrapper [EDA::Design::createComponent top_axi_wrapper]
+
+$top_axi_wrapper addHDLSourceFiles [concat \
+  $cc \
+  $axi \
+  $apb \
+  $dma_hdl \
+  $l2_subsystem_hdl \
+  [list \
+    "src/hdl/top/performance_monitor.sv" \
+    "src/hdl/top/top.sv" \
+    "src/hdl/top/top_axi_wrapper.sv" \
+  ]
+]
+
+$top_axi_wrapper addHDLIncludeDirectories [list \
+  "src/hdl/include" \
+]
+
+$top_axi_wrapper addPythonSimFiles [concat $global_sim_files $tools [list \
+  "src/test/top/test_top_axi_wrapper.py" \
+]]
 
 
 # memory_macro

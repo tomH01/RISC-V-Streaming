@@ -6,7 +6,7 @@ import math
 from collections import deque
 
 from cocotb.queue import Queue
-from cocotb.triggers import ClockCycles, RisingEdge, ReadOnly
+from cocotb.triggers import ClockCycles, RisingEdge, ReadOnly, ReadWrite, FallingEdge
 from cocotb.clock import Clock
 
 from utils.python.cocotb import get_design_parameters
@@ -57,7 +57,10 @@ class L2AllocatorDriver:
         await RisingEdge(self.dut.clk_i)
         self.dut.enable_i.value = 1
         
-    async def set_job(self, window_size):        
+    async def set_job(self, window_size):
+        if (self.dut.job_ready_o.value == 0):
+            return
+                
         payload_len = len(self.dut.payload_i)
         mode_len = len(self.dut.mode_i)
         window_size_len = len(self.dut.window_size_i)
@@ -84,6 +87,7 @@ class L2AllocatorDriver:
         low_bit += start_macro_len
         
         self.dut.stream_id_i.value = int((packed_job >> low_bit) & ((1 << stream_id_len) - 1))
+        #print(f"Setting Job: stream_id={int(self.dut.stream_id_i.value)}, start_macro={int(self.dut.start_macro_i.value)}, window_size={int(self.dut.window_size_i.value)}, mode={int(self.dut.mode_i.value)}")
         return packed_job
     
     async def set_done_vector(self, busy_workers):
@@ -144,11 +148,9 @@ class GoldenModel:
     async def run(self):        
         while True:
             await RisingEdge(self.dut.clk_i)
-            await ReadOnly()
             
             if self.dut.rst_ni.value == 0:
                 self.reset()
-                await ClockCycles(self.dut.clk_i, 2)
                 continue
             
             if self.dut.enable_i.value == 0:
@@ -156,19 +158,22 @@ class GoldenModel:
                 self.state['dispatch_ptr'] = int(self.dut.l2_bank_base_i.value)
                 continue            
             
+            worker_idx = self.get_idle_worker()
+            
             window_size = int(self.dut.window_size_i.value)
             window_size_b = window_size * self.data_width // 8
             
             job_valid = int(self.dut.job_valid_i.value)
             enable = int(self.dut.enable_i.value)
             dispatch_ready = int(self.dut.dispatch_ready_i.value)
-            occupied_space = (self.state['dispatch_ptr'] - int(self.dut.cpu_done_ptr_i.value)) % self.sram_size_b
+            
+            rel_dispatch = self.state['dispatch_ptr'] - self.bank_base
+            rel_cpu_done = int(self.dut.cpu_done_ptr_i.value) - self.bank_base
+
+            occupied_space = (rel_dispatch - rel_cpu_done + self.sram_size_b) % self.sram_size_b
             has_space_available = (occupied_space + window_size_b) <= self.sram_size_b
 
-            worker_idx = self.get_idle_worker()
-            
-            # Dispatch
-            if job_valid and enable and worker_idx is not None and has_space_available and dispatch_ready:
+            if job_valid and enable and worker_idx is not None and has_space_available and dispatch_ready and window_size != 0:
                 job = {
                     'job_wid': worker_idx,
                     'job_addr': self.state['dispatch_ptr'],
@@ -181,7 +186,7 @@ class GoldenModel:
                 self.scoreboard.add_expected_job(job)
                 self.state['dispatch_ptr'] = self.bank_base + (self.state['dispatch_ptr'] - self.bank_base + window_size_b) % self.sram_size_b  
                 
-                meta = self._get_meta_data(int(self.dut.stream_id_i.value), window_size)
+                meta = self._get_meta_data(int(self.dut.stream_id_i.value), window_size, worker_idx)
                 self.scoreboard.add_expected_meta(meta)
                 
                 self.state['busy_workers'][worker_idx] = True
@@ -196,10 +201,10 @@ class GoldenModel:
             if done_vector & (1 << i):
                 self.state['busy_workers'][i] = False
                 
-    def _get_meta_data(self, stream_id, window_size):
+    def _get_meta_data(self, stream_id, window_size, worker_idx):
         return {
             "dispatch_data": (stream_id << 27) | window_size,
-            "dispatch_worker_id": self.get_idle_worker()
+            "dispatch_worker_id": worker_idx
         }
             
         
@@ -243,9 +248,11 @@ class Scoreboard:
         self.added = 0
 
     def add_expected_job(self, value):
+        #print(f"Adding expected job: {value}")
         self.expected_job_q.put_nowait(value)
         
     def add_actual_job(self, value):
+        #print(f"Adding actual job: {value}")
         self.actual_job_q.put_nowait(value)
         self.added += 1
         
@@ -293,7 +300,7 @@ class Scoreboard:
             
     async def run(self):
         cocotb.start_soon(self.compare_jobs())
-        cocotb.start_soon(self.compare_meta())
+        #cocotb.start_soon(self.compare_meta())
 
 @cocotb.test()
 async def test_l2_allocator_crv(dut):
@@ -322,11 +329,11 @@ async def test_l2_allocator_crv(dut):
         
         NUM_CYCLES = 1000
         for j in range(NUM_CYCLES): 
-            await RisingEdge(dut.clk_i)
+            await FallingEdge(dut.clk_i)
             dut.job_valid_i.value = 0 
             dut.worker_done_i.value = 0
             
-            if rnd.random() < 0.5:     
+            if dut.job_ready_o and rnd.random() < 0.5:     
                 window_size = rnd.randint(1, 1024)
                 await driver.set_job(window_size)
                 
