@@ -12,16 +12,16 @@ if {![info exists ::params]} {
     error "\$::params is not defined in $params_file"
 }
 
-set bd_file [get_files -quiet system_bd.bd]
+set bd_file [get_files -quiet design_1.bd]
 
 if {$bd_file eq ""} {
-    error "Block Design 'system_bd.bd' is not registered in current project!"
+    error "Block Design 'design_1.bd' is not registered in current project!"
 }
 
 puts "Opening Block Design at: $bd_file"
 open_bd_design $bd_file
 
-set target_cell [get_bd_cells /top_wrapper_0(* keep = "true" *)]
+set target_cell [get_bd_cells -quiet /top_wrapper_0]
 
 if {$target_cell eq ""} {
     error "Could not find BD cell '/top_wrapper_0' in [get_property NAME [current_bd_design]]!"

@@ -57,6 +57,9 @@ class FIFOScoreboard:
     def is_full(self):
         return len(self.model) == self.depth
     
+    def usage(self):
+        return len(self.model)
+    
     def peek(self):
         if self.is_empty():
             return None
@@ -84,12 +87,14 @@ async def fifo_monitor(dut, scoreboard):
         pop = int(dut.pop_i.value)
         empty = int(dut.empty_o.value)
         full = int(dut.full_o.value)
+        usage = int(dut.usage_o.value)
         dout = int(dut.data_o.value) if not empty else None
         
         cover_fifo(push, pop, empty, full)
         
         assert empty == scoreboard.is_empty(), f"Empty signal mismatch: Expected {scoreboard.is_empty()}, got {empty}"
         assert full == scoreboard.is_full(), f"Full signal mismatch: Expected {scoreboard.is_full()}, got {full}"
+        assert usage == scoreboard.usage(), f"Usage signal mismatch: Expected {scoreboard.usage()}, got {usage}"
         if not empty:
             assert dout == scoreboard.peek(), f"Data output mismatch: Expected {scoreboard.peek()}, got {dout}"
         

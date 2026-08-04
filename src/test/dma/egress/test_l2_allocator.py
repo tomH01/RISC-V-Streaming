@@ -87,7 +87,6 @@ class L2AllocatorDriver:
         low_bit += start_macro_len
         
         self.dut.stream_id_i.value = int((packed_job >> low_bit) & ((1 << stream_id_len) - 1))
-        #print(f"Setting Job: stream_id={int(self.dut.stream_id_i.value)}, start_macro={int(self.dut.start_macro_i.value)}, window_size={int(self.dut.window_size_i.value)}, mode={int(self.dut.mode_i.value)}")
         return packed_job
     
     async def set_done_vector(self, busy_workers):
@@ -144,7 +143,7 @@ class GoldenModel:
     def reset(self):
         self.state['dispatch_ptr'] = 0
         self.state['busy_workers'] = [False] * self.w_workers
-
+    
     async def run(self):        
         while True:
             await RisingEdge(self.dut.clk_i)
@@ -173,6 +172,7 @@ class GoldenModel:
             occupied_space = (rel_dispatch - rel_cpu_done + self.sram_size_b) % self.sram_size_b
             has_space_available = (occupied_space + window_size_b) <= self.sram_size_b
 
+            dispatched_worker = None
             if job_valid and enable and worker_idx is not None and has_space_available and dispatch_ready and window_size != 0:
                 job = {
                     'job_wid': worker_idx,
@@ -189,9 +189,15 @@ class GoldenModel:
                 meta = self._get_meta_data(int(self.dut.stream_id_i.value), window_size, worker_idx)
                 self.scoreboard.add_expected_meta(meta)
                 
-                self.state['busy_workers'][worker_idx] = True
-                
-            self.update_busy_workers(int(self.dut.worker_done_i.value))
+                dispatched_worker = worker_idx
+
+            done_vector = int(self.dut.worker_done_i.value)
+            for i in range(len(self.state['busy_workers'])):
+                if done_vector & (1 << i):
+                    self.state['busy_workers'][i] = False
+
+            if dispatched_worker is not None:
+                self.state['busy_workers'][dispatched_worker] = True
     
     def get_idle_worker(self):
         return next((i for i, busy in enumerate(self.state['busy_workers']) if not busy), None)
@@ -248,11 +254,9 @@ class Scoreboard:
         self.added = 0
 
     def add_expected_job(self, value):
-        #print(f"Adding expected job: {value}")
         self.expected_job_q.put_nowait(value)
         
     def add_actual_job(self, value):
-        #print(f"Adding actual job: {value}")
         self.actual_job_q.put_nowait(value)
         self.added += 1
         
@@ -300,7 +304,7 @@ class Scoreboard:
             
     async def run(self):
         cocotb.start_soon(self.compare_jobs())
-        #cocotb.start_soon(self.compare_meta())
+        cocotb.start_soon(self.compare_meta())
 
 @cocotb.test()
 async def test_l2_allocator_crv(dut):
@@ -329,7 +333,7 @@ async def test_l2_allocator_crv(dut):
         
         NUM_CYCLES = 1000
         for j in range(NUM_CYCLES): 
-            await FallingEdge(dut.clk_i)
+            await RisingEdge(dut.clk_i)
             dut.job_valid_i.value = 0 
             dut.worker_done_i.value = 0
             

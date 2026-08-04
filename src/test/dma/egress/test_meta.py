@@ -49,7 +49,7 @@ class MetaDriver:
         await RisingEdge(self.dut.clk_i)  
         
     async def send_dispatch_data(self, stream_id, size, base_addr, worker_id):
-        data = ((stream_id & 0x1F) << 27) | ((size & 0x3FF) << 17) | (0x1FFFF & base_addr)
+        data = ((stream_id & 0x1F) << 27) | (size & 0x7FF_FFFF)
         self.dut.dispatch_valid_i.value = 1
         self.dut.dispatch_data_i.value = data
         self.dut.dispatch_worker_id_i.value = worker_id
@@ -71,13 +71,6 @@ class MetaDriver:
         self.dut.meta_req_i.value = 1
         self.dut.meta_addr_i.value = addr
         self.dut.meta_wen_i.value = 1
-    
-    async def req_dispatch_data(self):
-        addr = 0x84
-        
-        self.dut.meta_req_i.value = 1
-        self.dut.meta_addr_i.value = addr
-        self.dut.meta_wen_i.value = 1
         
     async def send_cpu_done_ptr(self, ptr):
         addr = 0x80
@@ -86,13 +79,27 @@ class MetaDriver:
         self.dut.meta_addr_i.value = addr
         self.dut.meta_wen_i.value = 0
         self.dut.meta_wdata_i.value = ptr
+    
+    async def req_dispatch_data(self):
+        addr = 0x84
+        
+        self.dut.meta_req_i.value = 1
+        self.dut.meta_addr_i.value = addr
+        self.dut.meta_wen_i.value = 1
+        
+    async def req_fifo_fill_level(self):
+        addr = 0x88
+        
+        self.dut.meta_req_i.value = 1
+        self.dut.meta_addr_i.value = addr
+        self.dut.meta_wen_i.value = 1
+        
         
     @staticmethod
     def decode_dispatch_data(data):
         stream_id = (data >> 27) & 0x1F
-        size = (data >> 17) & 0x3FF
-        base_addr = data & 0x1FFFF
-        return stream_id, size, base_addr
+        size = data & 0x7FF_FFFF
+        return stream_id, size
 
 
 class DMAMock:
@@ -191,6 +198,8 @@ class GoldenModel:
         cpu_done_ptr_write = False
         cpu_done_ptr_temp = 0
         
+        fifo_fill_ff = 0
+        
         await ReadOnly()
         while True:    
             req = int(self.dut.meta_req_i.value)
@@ -199,14 +208,17 @@ class GoldenModel:
             wen = int(self.dut.meta_wen_i.value)
             wdata = int(self.dut.meta_wdata_i.value)
             
+            cpu_ptr_wrt = (req == 1 and gnt == 1 and addr == 0x80 and wen == 0)
             current_fifo_r_req = (req == 1 and gnt == 1 and addr == 0x84 and wen == 1)
+            current_fifo_fill_r_req = (req == 1 and gnt == 1 and addr == 0x88 and wen == 1)
             
-            if req == 1 and gnt == 1 and addr == 0x80 and wen == 0:
+            if cpu_ptr_wrt:
                 cpu_done_ptr_write = True
                 cpu_done_ptr_temp = wdata
                 
+            fifo_fill = len(self.fifo)
+                
             await RisingEdge(self.dut.clk_i)
-            self.dut.meta_req_i.value = 0
             
             distances = [(ptr - self.cpu_done_ptr) % self.sram_size_b for ptr in self.stream_ptrs]
             max_advance_b = min(distances)
@@ -231,7 +243,12 @@ class GoldenModel:
                     actual["dispatch_data"] = self.fifo.popleft()
                 else:
                     raise Exception("FIFO read pending but no data available.")
-                
+            
+            # fifo fill level
+            if current_fifo_fill_r_req:
+                actual["fifo_fill_level"] = fifo_fill_ff
+            fifo_fill_ff = fifo_fill    
+            
             self.scoreboard.add_expected(actual)
             
             # fifo
@@ -247,7 +264,7 @@ class GoldenModel:
                     
             if int(self.dut.dispatch_valid_i.value) == 1 and int(self.dut.dispatch_ready_o.value) == 1:
                 data = int(self.dut.dispatch_data_i.value)
-                stream_id, _, _ = self.driver.decode_dispatch_data(data)
+                stream_id, _ = self.driver.decode_dispatch_data(data)
                 worker_id = int(self.dut.dispatch_worker_id_i.value)
                 self.order_fifos[stream_id].append(worker_id)
                 
@@ -312,6 +329,11 @@ class OutputMonitor:
                             "dispatch_data": rdata
                         }
                         self.scoreboard.add_actual(actual)
+                    elif rtype == "fifo_fill":
+                        actual = {
+                            "fifo_fill_level": rdata
+                        }
+                        self.scoreboard.add_actual(actual)
                     
             if self.mode == "cpu_done_ptr":
                 actual = {
@@ -333,6 +355,10 @@ class OutputMonitor:
             elif self.mode == "dispatch":
                 await self.driver.req_dispatch_data()
                 pipeline.append([1, "dispatch", None])
+                
+            elif self.mode == "fifo_fill":
+                await self.driver.req_fifo_fill_level()
+                pipeline.append([1, "fifo_fill", None])
         
 
 class Scoreboard:
@@ -356,8 +382,10 @@ class Scoreboard:
                 expected = await self.expected_q.get()
                 if "dispatch_data" in actual and "dispatch_data" not in expected:
                     continue
+                if "fifo_fill_level" in actual and "fifo_fill_level" not in expected:
+                    continue
                 break
-            
+                
             for key, value in actual.items():
                 if expected[key] != value:
                     await ClockCycles(self.dut.clk_i, 2)
@@ -385,7 +413,7 @@ async def test_meta(dut, mode):
     dma_mock = DMAMock(dut, driver)
     cocotb.start_soon(dma_mock.run())
     
-    NUM_CYCLES = 100000
+    NUM_CYCLES = 1000
     for _ in range(NUM_CYCLES):
         await RisingEdge(dut.clk_i)
         
@@ -400,3 +428,7 @@ async def test_meta_stream_ptrs(dut):
 @cocotb.test()
 async def test_meta_dispatch(dut):
     await test_meta(dut, mode="dispatch")
+
+@cocotb.test()
+async def test_meta_fifo_fill(dut):
+    await test_meta(dut, mode="fifo_fill")

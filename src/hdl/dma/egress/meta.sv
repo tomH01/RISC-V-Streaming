@@ -10,7 +10,9 @@ module meta #(
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
   localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
   localparam int SRAM_SIZE_B      = B_BANKS * BANK_DEPTH * DATA_WIDTH_BYTES,
-  localparam int SRAM_PTR_WIDTH   = $clog2(SRAM_SIZE_B)
+  localparam int SRAM_PTR_WIDTH   = $clog2(SRAM_SIZE_B),
+  localparam int DP_FIFO_DEPTH    = 16,
+  localparam int USAGE_WIDTH      = $clog2(DP_FIFO_DEPTH + 1)
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -48,22 +50,25 @@ module meta #(
   logic [DATA_WIDTH-1:0] cpu_done_ptr_q;
   logic [DATA_WIDTH-1:0] stream_ptrs_q [N_STREAMS];
 
-  logic                  fifo_full;
-  logic                  fifo_empty;
-  logic                  fifo_push;  
-  logic                  fifo_pop;
-  logic [DATA_WIDTH-1:0] fifo_dout;
+  logic                   fifo_full;
+  logic                   fifo_empty;
+  logic                   fifo_push;  
+  logic                   fifo_pop;
+  logic [DATA_WIDTH-1:0]  fifo_dout;
+  logic [USAGE_WIDTH-1:0] fifo_fill_level;
 
   logic [7:0] addr_offset;
   logic       is_stream_reg;
   logic       is_cpu_done_reg;
   logic       is_fifo_reg;
+  logic       is_fifo_fill_reg;
   logic [4:0] decoded_stream_id;
 
   assign addr_offset       = meta_addr_i[7:0];
   assign is_stream_reg     = (addr_offset < 8'h80);
   assign is_cpu_done_reg   = (addr_offset == 8'h80);
   assign is_fifo_reg       = (addr_offset == 8'h84);
+  assign is_fifo_fill_reg  = (addr_offset == 8'h88);
   assign decoded_stream_id = addr_offset[6:2];
 
   assign meta_gnt_o = (meta_req_i && is_fifo_reg && meta_wen_i) ? ~fifo_empty : 1'b1;
@@ -102,7 +107,9 @@ module meta #(
         end else if (is_cpu_done_reg) begin
           meta_r_rdata_o <= cpu_done_ptr_q;
         end else if (is_fifo_reg) begin
-          meta_r_rdata_o <= fifo_dout;          
+          meta_r_rdata_o <= fifo_dout;      
+        end else if (is_fifo_fill_reg) begin
+          meta_r_rdata_o <= fifo_fill_level;    
         end else begin
           meta_r_rdata_o <= '0;
         end
@@ -188,6 +195,7 @@ module meta #(
     .push_i(fifo_push),
     .data_i(dispatch_data_i),
     .full_o(fifo_full),
+    .usage_o(fifo_fill_level),
 
     .pop_i(fifo_pop),
     .data_o(fifo_dout),

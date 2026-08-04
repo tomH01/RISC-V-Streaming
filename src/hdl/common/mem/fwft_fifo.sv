@@ -1,14 +1,17 @@
 module fwft_fifo #(
   parameter int DATA_WIDTH = 32,
-  parameter int DEPTH      = 8
+  parameter int DEPTH      = 8,
+
+  localparam int USAGE_WIDTH = $clog2(DEPTH + 1)
 )(
   input logic clk_i,
   input logic rst_ni,
 
   // Write
-  input  logic                  push_i,
-  input  logic [DATA_WIDTH-1:0] data_i,
-  output logic                  full_o,
+  input  logic                   push_i,
+  input  logic [DATA_WIDTH-1:0]  data_i,
+  output logic                   full_o,
+  output logic [USAGE_WIDTH-1:0] usage_o,
 
   // Read
   input  logic                  pop_i,
@@ -23,7 +26,8 @@ module fwft_fifo #(
   assign full_o  = (count_q == DEPTH);
   assign empty_o = (count_q == 0);
 
-  assign data_o = mem[rd_ptr_q];
+  assign usage_o = count_q;
+  assign data_o  = mem[rd_ptr_q];
 
   logic push, pop;
   assign push = push_i && !full_o;
