@@ -10,7 +10,7 @@ module top_wrapper #(
     parameter MACRO_DEPTH         = 256,
     parameter BANK_DEPTH          = 8192,
     parameter STREAM_OFFSET_WIDTH = 10,
-    parameter ID_WIDTH            = 12,
+    parameter ID_WIDTH            = 16,
     parameter USER_WIDTH          = 1
 )(
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 clk_i CLK" *)

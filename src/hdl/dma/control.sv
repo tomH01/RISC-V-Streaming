@@ -162,10 +162,10 @@ module control #(
   end
 
   assign dma_enable_o    = global_ctrl_q[31];
-  assign egress_enable_o = egress_enable_q[31];
+  assign egress_enable_o = egress_enable_q[31] | dma_enable_o;
   assign l2_bank_base_o  = l2_bank_base_q;
 
-  assign stream_en_o   = stream_en_q;
+  assign stream_en_o   = stream_en_q | {N_STREAMS{dma_enable_o}};
   assign start_macro_o = start_macro_q;
   assign window_size_o = window_size_q;
   assign cfg_push_o    = cfg_push_q;

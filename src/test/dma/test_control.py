@@ -27,18 +27,18 @@ async def test_global_control(dut):
     
     NUM_CYCLES = 1000
     for _ in range(NUM_CYCLES):    
-        dma_enable = rnd.choice([0, 1])
-        global_control = driver.get_enable(dma_enable)    
-        await driver.send_global_config("global_ctrl", global_control)
+        en_value = rnd.choice([0, 1])
+        dma_enable = driver.get_enable(en_value)    
+        await driver.send_global_config("dma_enable", dma_enable)
         await ReadOnly()
-        assert int(dut.dma_enable_o.value) == dma_enable, f"Expected dma_enable_o to be {dma_enable}, got: {dut.dma_enable_o.value}"
+        assert int(dut.dma_enable_o.value) == en_value, f"Expected dma_enable_o to be {en_value}, got: {dut.dma_enable_o.value}"
         await FallingEdge(dut.clk_i)
         
         egress_enable = rnd.choice([0, 1])
         egress_value = driver.get_enable(egress_enable)
         await driver.send_global_config("egress_enable", egress_value)
         await ReadOnly()
-        assert int(dut.egress_enable_o.value) == egress_enable, f"Expected egress_enable_o to be {egress_enable}, got: {dut.egress_enable.value}"
+        assert int(dut.egress_enable_o.value) == (egress_enable or bool(dut.dma_enable_o.value)), f"Expected egress_enable_o to be {egress_enable}, got: {dut.egress_enable_o.value}"
         await FallingEdge(dut.clk_i)
         
         bank_base_value = rnd.getrandbits(32)

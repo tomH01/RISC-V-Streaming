@@ -12,8 +12,8 @@ class ControlDriver:
     TOPOLOGY_BASE = 0x48002000
     INTERVAL_BASE = 0x48003000
     
-    GLOBAL_CONTROL = 0x00
-    DMA_ENABLE = 0x04
+    DMA_ENABLE = 0x00
+    EGRESS_ENABLE = 0x04
     BANK_BASE = 0x08  
     
     STREAM_STRIDE = 0x20
@@ -49,12 +49,12 @@ class ControlDriver:
         
     async def send_global_config(self, config_type, data):       
         match config_type:
-            case "global_ctrl":
-                addr = self.GLOBAL_BASE + self.GLOBAL_CONTROL
-            case "bank_base":
-                addr = self.GLOBAL_BASE + self.BANK_BASE
             case "dma_enable":
                 addr = self.GLOBAL_BASE + self.DMA_ENABLE
+            case "bank_base":
+                addr = self.GLOBAL_BASE + self.BANK_BASE
+            case "egress_enable":
+                addr = self.GLOBAL_BASE + self.EGRESS_ENABLE
             case _:
                 raise ValueError(f"Unknown config type: {config_type}")
                 
