@@ -19,6 +19,7 @@ module performance_monitor #(
 
   // DMA IF
   input  logic                 dma_enable_i,
+  input  logic                 dma_setup_start_i,
 
   input  logic [N_STREAMS-1:0] ingr_stm_in_valid_i,
   input  logic [N_STREAMS-1:0] ingr_stm_in_ready_i,
@@ -64,7 +65,7 @@ module performance_monitor #(
       setup_cnt_q  <= '0;
       run_cnt_q    <= '0;
     end else begin
-      if (!dma_enable_i && !dma_enable_q) begin
+      if (dma_setup_start_i && !dma_enable_i && !dma_enable_q) begin
         setup_cnt_q <= setup_cnt_q + 1;
       end 
       if (dma_enable_i) begin

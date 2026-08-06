@@ -58,6 +58,7 @@ async def test_ingress_control(dut):
     
     driver = ControlDriver(dut)
     await driver.reset()
+    assert int(dut.setup_active_o) == 0, f"Expected setup_active_o to be 0 after reset, got: {dut.setup_active_o.value}"
     
     randomizer = ConfigRandomizer(n_streams, m_macros, macro_depth)
     
@@ -71,6 +72,7 @@ async def test_ingress_control(dut):
             await ReadOnly()
             assert dut.stream_en_o[stream_idx].value == stream_en, f"Expected stream_en_o[{stream_idx}] to be {stream_en}, got: {dut.stream_en_o[stream_idx].value}"
             await FallingEdge(dut.clk_i)
+            assert int(dut.setup_active_o) == 1, f"Expected setup_active_o to be 1 after sending first APB, got: {dut.setup_active_o.value}"
             
             await driver.send_ingress_config("window_size", cfg["window_size"], stream_idx)
             await ReadOnly()

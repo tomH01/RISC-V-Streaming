@@ -29,6 +29,7 @@ class PerformanceMonitorDriver:
         
     def _init_signals(self):
         self.dut.dma_enable_i.value = 0
+        self.dut.dma_setup_start_i.value = 1
         
         self.dut.ingr_stm_in_valid_i.value = 0
         self.dut.ingr_stm_in_ready_i.value = 0
@@ -78,7 +79,7 @@ class PerformanceMonitorDriver:
         BASE_ADDR = 0x48004000
         
         addr = BASE_ADDR + word_offset * 4
-        return await self.apb_driver.apb_read(addr)
+        return await self.apb_driver.read(addr)
         
         
         
@@ -134,10 +135,11 @@ class GoldenModel:
                 continue
             
             dma_en = int(self.dut.dma_enable_i.value)
+            dma_setup_start = int(self.dut.dma_setup_start_i.value)
             
             self.next_counters = self.counters.copy()
             
-            if not dma_en and not self.dma_enabled:
+            if dma_setup_start and not dma_en and not self.dma_enabled:
                 self.next_counters[0x000] += 1
             elif dma_en:
                 self.next_counters[0x001] += 1
@@ -232,7 +234,6 @@ class Scoreboard:
             act = await self.actual_q.get()
             
             assert exp == act, f"Scoreboard mismatch: expected {exp}, got {act}"
-            print(f"Scoreboard match: expected {exp}, got {act}")
     async def run(self):
         cocotb.start_soon(self.compare_jobs())
         
