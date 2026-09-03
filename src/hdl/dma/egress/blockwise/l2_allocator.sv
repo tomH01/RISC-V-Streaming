@@ -31,7 +31,6 @@ module l2_allocator #(
   input  logic [W_WORKERS-1:0]        worker_done_i,
   output logic [WORKER_PTR_WIDTH-1:0] job_wid_o,
   output logic [ADDR_WIDTH-1:0]       job_addr_o,
-  output logic [BANK_PTR_WIDTH-1:0]   job_bank_o,
   job_if.tx_push                      job_assign_o,
 
   // Meta Writer IF:
@@ -191,7 +190,6 @@ module l2_allocator #(
   job_pkt_t                    job_pkt_q,   job_pkt_d;
   logic [WORKER_PTR_WIDTH-1:0] job_wid_q,   job_wid_d;
   logic [ADDR_WIDTH-1:0]       job_addr_q,  job_addr_d;
-  logic [BANK_PTR_WIDTH-1:0]   job_bank_q,  job_bank_d;
 
   always_comb begin
     bank_offset_d    = bank_offset_q;
@@ -205,7 +203,6 @@ module l2_allocator #(
     job_pkt_d   = job_pkt_q;
     job_wid_d   = job_wid_q;
     job_addr_d  = job_addr_q;
-    job_bank_d  = job_bank_q;
 
     for (int w = 0; w < W_WORKERS; w++) begin
       if (worker_done_i[w] && worker_is_busy_q[w]) begin
@@ -225,7 +222,6 @@ module l2_allocator #(
       job_addr_d  = l2_bank_base_i + 
                     (ADDR_WIDTH'(target_bank) * ADDR_WIDTH'(BANK_SIZE_BYTES)) + 
                     bank_header_size_b_i + bank_offset_q[target_bank];
-      job_bank_d  = target_bank;
 
       worker_is_busy_d[idle_wid] = 1'b1;
       worker_target_d[idle_wid]  = target_bank;
@@ -270,7 +266,6 @@ module l2_allocator #(
       job_pkt_q   <= '0;
       job_wid_q   <= '0;
       job_addr_q  <= '0;
-      job_bank_q  <= '0;
     end else begin
       bank_offset_q    <= bank_offset_d;
       bank_stream_q    <= bank_stream_d;
@@ -283,7 +278,6 @@ module l2_allocator #(
       job_pkt_q   <= job_pkt_d;
       job_wid_q   <= job_wid_d;
       job_addr_q  <= job_addr_d;
-      job_bank_q  <= job_bank_d;
     end
   
   end
@@ -299,6 +293,5 @@ module l2_allocator #(
   assign job_assign_o.pkt   = job_pkt_q;
   assign job_wid_o          = job_wid_q;
   assign job_addr_o         = job_addr_q;
-  assign job_bank_o         = job_bank_q;
   
 endmodule

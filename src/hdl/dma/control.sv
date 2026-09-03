@@ -26,7 +26,6 @@ module control #(
   output logic                  dma_enable_o,
   output logic                  egress_enable_o,
   output logic [DATA_WIDTH-1:0] l2_bank_base_o,
-  output logic                  setup_active_o,
 
   // Ingress IF
   output logic [N_STREAMS-1:0]       stream_en_o,
@@ -60,8 +59,6 @@ module control #(
   logic [MACRO_PTR_WIDTH-1:0] next_pointer_q    [M_MACROS];
 
   logic [DATA_WIDTH-1:0] stream_interval_q [N_STREAMS];
-
-  logic setup_active_q;
 
   logic  is_apb_space;
   assign is_apb_space = (paddr_i[27] == 1'b1);
@@ -100,7 +97,6 @@ module control #(
       global_ctrl_q         <= '0;
       egress_enable_q       <= '0;
       l2_bank_base_q        <= '0;
-      setup_active_q        <= '0;
 
       start_macro_q     <= '{default: '0};
       window_size_q     <= '{default: '0};
@@ -118,8 +114,6 @@ module control #(
       cfg_push_q <= '{default: 1'b0}; 
 
       if (wr_en && is_apb_space) begin
-        setup_active_q <= 1'b1;
-
         // Global Configuration
         if (is_global_cfg) begin
           case (global_offset)
@@ -170,7 +164,6 @@ module control #(
   assign dma_enable_o    = global_ctrl_q[31];
   assign egress_enable_o = egress_enable_q[31] | dma_enable_o;
   assign l2_bank_base_o  = l2_bank_base_q;
-  assign setup_active_o  = setup_active_q;
 
   assign stream_en_o   = stream_en_q | {N_STREAMS{dma_enable_o}};
   assign start_macro_o = start_macro_q;

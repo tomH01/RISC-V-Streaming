@@ -1,4 +1,4 @@
-module top_interleaved #(
+module top #(
   parameter int N_STREAMS           = 4,
   parameter int M_MACROS            = 8,
   parameter int DATA_WIDTH          = 32,
@@ -57,9 +57,17 @@ module top_interleaved #(
   assign pready_o  = is_perf_mon ? perf_pready  : dma_pready;
   assign pslverr_o = is_perf_mon ? perf_pslverr : dma_pslverr;
 
+  logic dma_setup_started_q;
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      dma_setup_started_q <= 1'b0;
+    end else if (psel_dma && penable_i && dma_pready) begin
+      dma_setup_started_q <= 1'b1;
+    end
+  end
 
   // DMA
-
   logic [DMA_MANAGERS-1:0] dma_ready;
   logic [DMA_MANAGERS-1:0] dma_valid;
   logic [ADDR_WIDTH-1:0]   dma_addr  [DMA_MANAGERS];
@@ -91,8 +99,8 @@ module top_interleaved #(
   logic                 perf_data_meta_req;
   logic                 perf_data_meta_gnt;
 
-  assign perf_data_l2_valid = data_req_i;
-  assign perf_data_l2_ready = data_gnt_o;
+  assign perf_data_l2_valid = data_req_i && !meta_req;
+  assign perf_data_l2_ready = data_gnt_o && !meta_req;
   assign perf_data_meta_req = meta_req;
   assign perf_data_meta_gnt = meta_gnt;
 
@@ -212,6 +220,7 @@ module top_interleaved #(
     .pslverr_o(perf_pslverr),
 
     .dma_enable_i(perf_dma_enable),
+    .dma_setup_start_i(dma_setup_started_q),
 
     .ingr_stm_in_valid_i(perf_ingr_stm_in_valid),
     .ingr_stm_in_ready_i(perf_ingr_stm_in_ready),

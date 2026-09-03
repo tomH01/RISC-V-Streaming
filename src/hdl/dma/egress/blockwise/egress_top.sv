@@ -50,7 +50,25 @@ module egress_top #(
   input  logic [NUM_MASTERS-1:0]    bus_ready_i,
   output logic [NUM_MASTERS-1:0]    bus_valid_o,
   output logic [ADDR_WIDTH-1:0]     bus_addr_o  [NUM_MASTERS],
-  output logic [DATA_WIDTH-1:0]     bus_wdata_o [NUM_MASTERS]
+  output logic [DATA_WIDTH-1:0]     bus_wdata_o [NUM_MASTERS],
+
+  // Performance IF
+
+  // Job Manager -> L2 Allocator
+  output logic perf_egr_job_req_valid_o,
+  output logic perf_egr_job_req_ready_o,
+
+  // L2 Allocator -> Meta
+  output logic perf_egr_meta_disp_valid_o,
+  output logic perf_egr_meta_disp_ready_o,
+
+  // Worker -> Buffer Pool
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bp_req_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bp_gnt_o,
+
+  // Worker -> Bus
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bus_valid_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bus_ready_o
 );
 
   // ############
@@ -212,5 +230,18 @@ module egress_top #(
       bp_release_o |= bp_release_all_o[i];
     end
   end
+
+  // Performance IF
+  assign perf_egr_job_req_valid_o  = u_job_req_if.valid;
+  assign perf_egr_job_req_ready_o  = u_job_req_if.ready;
+
+  assign perf_egr_meta_disp_valid_o = u_meta_req_if.valid;
+  assign perf_egr_meta_disp_ready_o = u_meta_req_if.ready;
+
+  assign perf_egr_wkr_bp_req_o   = bp_req_o;
+  assign perf_egr_wkr_bp_gnt_o   = bp_gnt_i;
+
+  assign perf_egr_wkr_bus_valid_o = bus_valid_o;
+  assign perf_egr_wkr_bus_ready_o = bus_ready_i;
 
 endmodule

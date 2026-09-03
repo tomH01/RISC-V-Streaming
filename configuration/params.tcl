@@ -12,4 +12,4 @@ dict set ::params STRIDE_WIDTH 14
 dict set ::params COUNT_WIDTH 10
 dict set ::params NUM_AXES 4
 dict set ::params STREAM_OFFSET_WIDTH 20
-dict set ::params BANK_DEPTH 16384
+dict set ::params BANK_DEPTH 8192

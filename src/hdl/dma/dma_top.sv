@@ -52,7 +52,7 @@ module dma_top #(
 
   output logic [N_STREAMS-1:0] perf_ingr_stm_in_valid_o,
   output logic [N_STREAMS-1:0] perf_ingr_stm_in_ready_o,
-
+  
   output logic                 perf_egr_job_req_valid_o,
   output logic                 perf_egr_job_req_ready_o,
   output logic                 perf_egr_meta_disp_valid_o,

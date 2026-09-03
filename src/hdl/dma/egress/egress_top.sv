@@ -61,8 +61,6 @@ module egress_top #(
   output logic [DATA_WIDTH-1:0]     bus_wdata_o [DMA_MANAGERS],
 
   // Performance IF
-  // ##############
-
   // Job Manager -> L2 Allocator
   output logic perf_egr_job_req_valid_o,
   output logic perf_egr_job_req_ready_o,

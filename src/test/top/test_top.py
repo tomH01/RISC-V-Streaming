@@ -44,7 +44,7 @@ class TopDriver(BaseDriver):
         self.dut.data_addr_i.value = 0  
 
 @cocotb.test()
-async def test_dma_top(dut):
+async def test_top(dut):
     rnd.seed(42)
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
     
@@ -89,8 +89,7 @@ async def test_dma_top(dut):
     num_reads = 0    
     trials = 0
     
-    NUM_WINDOWS = 100
-    MAX_CYCLES = 300000
+    MAX_CYCLES = 3500000
     for cycle in range(MAX_CYCLES):
         if cycle % 100000 == 0:
             print(f"Cycle {cycle}")

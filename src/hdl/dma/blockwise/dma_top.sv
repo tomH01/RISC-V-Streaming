@@ -27,21 +27,35 @@ module dma_top #(
   output logic                  pready_o,
   output logic                  pslverr_o,
 
+  // CPU IF
+  output logic [B_BANKS-1:0] bank_full_o,
+
   // TCDM Bus IF
   input  logic [NUM_MANAGERS-1:0]   bus_ready_i,
   output logic [NUM_MANAGERS-1:0]   bus_valid_o,
   output logic [ADDR_WIDTH-1:0]     bus_addr_o  [NUM_MANAGERS],
   output logic [DATA_WIDTH-1:0]     bus_wdata_o [NUM_MANAGERS],
 
-  // CPU IF
-  output logic [B_BANKS-1:0] bank_full_o
+  // Perfomance IF
+  output logic                 perf_dma_enable_o,
+
+  output logic [N_STREAMS-1:0] perf_ingr_stm_in_valid_o,
+  output logic [N_STREAMS-1:0] perf_ingr_stm_in_ready_o,
+  
+  output logic                 perf_egr_job_req_valid_o,
+  output logic                 perf_egr_job_req_ready_o,
+  output logic                 perf_egr_meta_disp_valid_o,
+  output logic                 perf_egr_meta_disp_ready_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bp_req_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bp_gnt_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bus_valid_o,
+  output logic [W_WORKERS-1:0] perf_egr_wkr_bus_ready_o  
 );
 
   // #######
   // Control
 
   logic                       cfg_egress_enable;
-  logic                       cfg_dma_enable;  
   logic [DATA_WIDTH-1:0]      cfg_l2_bank_base;
   logic [DATA_WIDTH-1:0]      cfg_bank_header_size_b;
   logic [B_BANKS-1:0]         cfg_bank_owner;
@@ -75,7 +89,7 @@ module dma_top #(
     .pready_o(pready_o),
     .pslverr_o(pslverr_o),
 
-    .dma_enable_o(cfg_dma_enable),
+    .dma_enable_o(perf_dma_enable_o),
     .egress_enable_o(cfg_egress_enable),
     .l2_bank_base_o(cfg_l2_bank_base),
     .bank_header_size_b_o(cfg_bank_header_size_b),
@@ -159,7 +173,10 @@ module dma_top #(
     .cfg_next_pointer_i(cfg_next_pointer),
 
     .notif_valid_o(notif_valid),
-    .notif_start_macro_o(notif_start_macro)
+    .notif_start_macro_o(notif_start_macro),
+
+    .perf_ingr_stm_in_valid_o(perf_ingr_stm_in_valid_o),
+    .perf_ingr_stm_in_ready_o(perf_ingr_stm_in_ready_o)
   );
 
 
@@ -214,7 +231,16 @@ module dma_top #(
     .bus_ready_i(bus_ready_i),
     .bus_valid_o(bus_valid_o),
     .bus_addr_o(bus_addr_o),
-    .bus_wdata_o(bus_wdata_o)
+    .bus_wdata_o(bus_wdata_o),
+
+    .perf_egr_job_req_valid_o(perf_egr_job_req_valid_o),
+    .perf_egr_job_req_ready_o(perf_egr_job_req_ready_o),
+    .perf_egr_meta_disp_valid_o(perf_egr_meta_disp_valid_o),
+    .perf_egr_meta_disp_ready_o(perf_egr_meta_disp_ready_o),
+    .perf_egr_wkr_bp_req_o(perf_egr_wkr_bp_req_o),
+    .perf_egr_wkr_bp_gnt_o(perf_egr_wkr_bp_gnt_o),
+    .perf_egr_wkr_bus_valid_o(perf_egr_wkr_bus_valid_o),
+    .perf_egr_wkr_bus_ready_o(perf_egr_wkr_bus_ready_o)
   );
 
 

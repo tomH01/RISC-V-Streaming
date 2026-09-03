@@ -108,6 +108,8 @@ async def test_dma_top(dut):
         
         data_driver.clear_bus()
         
-        await dma_driver.issue_request(cycle)            
-            
+        await dma_driver.issue_request(cycle)   
         
+    await dma_driver.toggle_dma_enable(False)
+    print(await ctrl_driver.fetch_all_perf_counters())         
+            
