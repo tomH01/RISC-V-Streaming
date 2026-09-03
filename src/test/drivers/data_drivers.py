@@ -1,7 +1,9 @@
+import asyncio
 import cocotb
 
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, ReadOnly
 
+from cpu_state import CPUOp 
 from utils.python.cocotb import get_design_parameters
 params = get_design_parameters()
 
@@ -10,9 +12,9 @@ class AXIDriver:
     def __init__(self, dut):
         self.dut = dut
         
-        self._clear_bus()
+        self.clear_bus()
         
-    def _clear_bus(self):
+    def clear_bus(self):
         self.dut.s_axi_data_awid_i.value = 0
         self.dut.s_axi_data_awaddr_i.value = 0
         self.dut.s_axi_data_awlen_i.value = 0
@@ -106,4 +108,46 @@ class AXIDriver:
                     break
 
         return read_data
+    
+    
+class OBIDriver:
+    def __init__(self, dut):
+        self.dut = dut
+        
+        self.clear_bus()
+        
+    def clear_bus(self):
+        self.dut.data_req_i.value = 0
+        self.dut.data_addr_i.value = 0
+        self.dut.data_wdata_i.value = 0
+        self.dut.data_be_i.value = 0
+        self.dut.data_we_i.value = 0
+        
+    
+    def write(self, addr, wdata, be=0xF):
+        self.dut.data_req_i.value = 1
+        self.dut.data_addr_i.value = addr
+        self.dut.data_wdata_i.value = wdata 
+        self.dut.data_be_i.value = be
+        self.dut.data_we_i.value = 1
+        
+    async def read(self, addr):
+        self.dut.data_req_i.value = 1
+        self.dut.data_addr_i.value = addr
+        self.dut.data_we_i.value = 0
+        await RisingEdge(self.dut.clk_i)
+        self.dut.data_req_i.value = 0
+        
+        await ReadOnly()
+        while self.dut.data_gnt_o.value == 0:
+            await RisingEdge(self.dut.clk_i)
+            await ReadOnly()
+        return int(self.dut.data_rdata_o.value)
+        
+    
+    def read_init(self, addr):
+        self.dut.data_req_i.value = 1
+        self.dut.data_addr_i.value = addr
+        self.dut.data_we_i.value = 0
+        return (CPUOp.READ_DATA, addr)
     

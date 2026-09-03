@@ -6,8 +6,10 @@ module sram_interconnect #(
   parameter int BANK_DEPTH  = 8192,
 
   localparam int BANK_PTR_WIDTH    = $clog2(B_BANKS),
+  localparam int BANK_ADDR_WIDTH   = $clog2(BANK_DEPTH),
   localparam int DATA_WIDTH_BYTES  = DATA_WIDTH / 8,
-  localparam int DMA_MANAGERS      = W_WORKERS,
+  localparam int META_MANAGER      = 1,
+  localparam int DMA_MANAGERS      = W_WORKERS + META_MANAGER,
   localparam int CPU_MANAGERS      = 1,
   localparam int NUM_MANAGERS      = DMA_MANAGERS + CPU_MANAGERS,
   localparam int NUM_SUBORDINATES  = B_BANKS,
@@ -47,18 +49,7 @@ module sram_interconnect #(
   input  logic [B_BANKS-1:0]          sram_gnt_i ,
 
   input  logic [DATA_WIDTH-1:0] sram_r_rdata_i [B_BANKS],
-  input  logic [B_BANKS-1:0]    sram_r_valid_i,
-
-  // Meta IF
-  output logic                        meta_req_o ,
-  output logic [ADDR_WIDTH-1:0]       meta_addr_o,
-  output logic                        meta_wen_o ,
-  output logic [DATA_WIDTH-1:0]       meta_wdata_o,
-  output logic [DATA_WIDTH_BYTES-1:0] meta_be_o,
-  input  logic                        meta_gnt_i ,
-
-  input  logic [DATA_WIDTH-1:0] meta_r_rdata_i,
-  input  logic                  meta_r_valid_i
+  input  logic [B_BANKS-1:0]    sram_r_valid_i
 );
   typedef struct packed {
     logic [ADDR_WIDTH-1:0]       addr;
@@ -76,9 +67,6 @@ module sram_interconnect #(
   logic      [NUM_SUBORDINATES-1:0][MANAGER_PTR_WIDTH-1:0] xbar_idx_out;
   logic      [NUM_SUBORDINATES-1:0]                        xbar_valid_out;    
   logic      [NUM_SUBORDINATES-1:0]                        xbar_ready_in;
-
-  logic  cpu_to_meta_req;
-  assign cpu_to_meta_req = cpu_valid_i && (cpu_addr_i[20] == 1'b1);
 
   logic [DMA_MANAGERS-1:0] dma_pending_q;
 
@@ -98,25 +86,19 @@ module sram_interconnect #(
     xbar_din[DMA_MANAGERS].wdata   = cpu_wdata_i;
     xbar_din[DMA_MANAGERS].wen     = cpu_wen_i;
     xbar_din[DMA_MANAGERS].be      = cpu_be_i;
-    xbar_bank_sel_in[DMA_MANAGERS] = cpu_addr_i[BANK_PTR_WIDTH+2-1:2];
-
-    if (cpu_to_meta_req) begin
-      xbar_valid_in[DMA_MANAGERS] = 1'b0;
-      cpu_ready_o                 = meta_gnt_i;
-    end else begin
-      xbar_valid_in[DMA_MANAGERS] = cpu_valid_i;
-      cpu_ready_o                 = xbar_ready_out[DMA_MANAGERS];
-    end
+    xbar_bank_sel_in[DMA_MANAGERS] = cpu_addr_i[BANK_PTR_WIDTH+BANK_ADDR_WIDTH+2-1:BANK_ADDR_WIDTH+2];
+    xbar_valid_in[DMA_MANAGERS] = cpu_valid_i;
+    cpu_ready_o                 = xbar_ready_out[DMA_MANAGERS];
 
     for (int i = 0; i < DMA_MANAGERS; i++) begin
       xbar_din[i].addr    = dma_addr_i[i];
       xbar_din[i].wdata   = dma_wdata_i[i];
       xbar_din[i].wen     = dma_wen_i[i];
       xbar_din[i].be      = dma_be_i[i];
-      xbar_bank_sel_in[i] = dma_addr_i[i][BANK_PTR_WIDTH+2-1:2];
+      xbar_bank_sel_in[i] = dma_addr_i[i][BANK_PTR_WIDTH+BANK_ADDR_WIDTH+2-1:BANK_ADDR_WIDTH+2];
 
       // Prioritize CPU over DMA
-      if (cpu_valid_i && !cpu_to_meta_req && xbar_bank_sel_in[DMA_MANAGERS] == xbar_bank_sel_in[i] && !dma_pending_q[i]) begin
+      if (cpu_valid_i && xbar_bank_sel_in[DMA_MANAGERS] == xbar_bank_sel_in[i] && !dma_pending_q[i]) begin
         xbar_valid_in[i] = 1'b0;
         dma_ready_o[i]   = 1'b0;
       end else begin
@@ -124,21 +106,6 @@ module sram_interconnect #(
         dma_ready_o[i]   = xbar_ready_out[i];
       end
     end
-  end
-
-  always_comb begin
-    meta_req_o   = cpu_to_meta_req;
-    if (cpu_to_meta_req) begin
-      meta_addr_o  = cpu_addr_i;
-      meta_wdata_o = cpu_wdata_i;
-      meta_wen_o   = cpu_wen_i;
-      meta_be_o    = cpu_be_i;
-    end else begin
-      meta_addr_o  = '0;
-      meta_wdata_o = '0;
-      meta_wen_o   = '1;
-      meta_be_o    = '0;
-    end 
   end
 
   stream_xbar #(
@@ -212,11 +179,6 @@ module sram_interconnect #(
           cpu_r_valid_o = 1'b1;
         end
       end
-    end
-
-    if (meta_r_valid_i) begin
-      cpu_r_rdata_o = meta_r_rdata_i;
-      cpu_r_valid_o = 1'b1;
     end
   end
 

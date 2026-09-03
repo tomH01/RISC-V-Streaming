@@ -44,15 +44,19 @@ module alloc_manager #(
   logic [N_STREAMS-1:0] window_end;
   logic [N_STREAMS-1:0] macro_end;
 
+
+
   // Done Logic
   always_comb begin
     done_o = '0;
 
     for (int n = 0; n < N_STREAMS; n++) begin
-      if (cfg_stream_en_i[n] && is_initialized_q[n] && window_end[n]) begin
-        done_o[current_macro_q[n]] = 1'b1;
+      if (cfg_stream_en_i[n] && is_initialized_q[n]) begin
+        if (macro_end[n] || window_end[n]) begin
+          done_o[current_macro_q[n]] = 1'b1;
+        end
       end
-    end
+    end 
   end
 
   // Allocation Logic

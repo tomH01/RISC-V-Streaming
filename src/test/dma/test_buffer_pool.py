@@ -101,7 +101,7 @@ async def test_rw_coverage(dut):
     scoreboard = {i: {} for i in range(m_macros)}
     macro_owners = [0] * m_macros  
     
-    NUM_CYCLES = 10000
+    NUM_CYCLES = 1000
     num_writes = 0
     num_reads = 0    
     

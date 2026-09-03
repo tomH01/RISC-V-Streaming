@@ -29,8 +29,8 @@ class TopAXIWrapperDriver(BaseDriver):
         self.m_macros = int(params["M_MACROS"])
         
         self.ctrl_driver = ControlDriver(dut, driver_protocol="axi")  
-        self.axi_driver = AXIDriver(dut)
-        self.dma_driver = DMADriver(dut, self.ctrl_driver, self.axi_driver)
+        self.data_driver = AXIDriver(dut)
+        self.dma_driver = DMADriver(dut, self.ctrl_driver, self.data_driver)
 
 @cocotb.test()
 async def test_top_axi_wrapper(dut):
@@ -77,7 +77,7 @@ async def test_top_axi_wrapper(dut):
         "size": 0
         }
     
-    for i in range(100):
+    for i in range(10000):
         if current_job["size"] == 0:
             while True:
                 await RisingEdge(dut.clk_i)
@@ -94,7 +94,7 @@ async def test_top_axi_wrapper(dut):
             print(f"Dispatch data: Stream ID: {stream_id}, Size: {size}")
         
         if agu_done_ptr[current_job["stream_id"]] > cpu_done_ptr:
-            stream_data = await driver.axi_driver.read(cpu_done_ptr)
+            stream_data = await driver.data_driver.read(cpu_done_ptr)
             current_job["size"] -= data_width_b
             print(f"Addr: 0x{cpu_done_ptr:08X} Data: 0x{stream_data:08X}")
             cpu_done_ptr += data_width_b

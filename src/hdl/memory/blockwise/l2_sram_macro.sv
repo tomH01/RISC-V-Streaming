@@ -74,12 +74,7 @@ module l2_sram_macro #(
       end
 
       logic [BANK_ADDR_WIDTH-1:0] internal_bank_addr;
-
-      if (B_BANKS > 1) begin : gen_multi_addr_slice
-        assign internal_bank_addr = addr_i[i][BANK_PTR_WIDTH+BANK_ADDR_WIDTH+2-1:2+BANK_PTR_WIDTH];
-      end else begin : gen_single_addr_slice
-        assign internal_bank_addr = addr_i[i][BANK_ADDR_WIDTH+2-1:2];
-      end
+      assign internal_bank_addr = addr_i[i][BANK_ADDR_WIDTH+2-1:2];
 
       assign BE_BW_BANK[i] = {
         {8{be_i[i][3]}},

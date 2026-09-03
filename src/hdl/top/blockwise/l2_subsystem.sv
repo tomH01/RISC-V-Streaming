@@ -1,11 +1,11 @@
 module l2_subsystem #(
-  parameter int DATA_WIDTH = 32,
-  parameter int ADDR_WIDTH = 32,
-  parameter int W_WORKERS  = 1,
-  parameter int B_BANKS    = 2,
-  parameter int BANK_DEPTH = 16384,
+  parameter int DATA_WIDTH   = 32,
+  parameter int ADDR_WIDTH   = 32,
+  parameter int W_WORKERS    = 1,
+  parameter int B_BANKS      = 2,
+  parameter int BANK_DEPTH   = 16384,
+  parameter int DMA_MANAGERS = W_WORKERS,
 
-  localparam int DMA_MANAGERS     = W_WORKERS,
   localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8
 )(
   input logic clk_i,
@@ -24,17 +24,7 @@ module l2_subsystem #(
   input  logic                        cpu_wen_i,
 
   output logic [DATA_WIDTH-1:0] cpu_r_rdata_o,
-  output logic                  cpu_r_valid_o,
-
-  output logic                        meta_req_o,
-  output logic [ADDR_WIDTH-1:0]       meta_addr_o,
-  input  logic                        meta_gnt_i,
-  output logic                        meta_wen_o,
-  output logic [DATA_WIDTH-1:0]       meta_wdata_o,
-  output logic [DATA_WIDTH_BYTES-1:0] meta_be_o,
-
-  input  logic [DATA_WIDTH-1:0] meta_r_rdata_i,
-  input  logic                  meta_r_valid_i
+  output logic                  cpu_r_valid_o
 );
 
   // SRAM Interconnect
@@ -94,16 +84,7 @@ module l2_subsystem #(
     .sram_be_o(sram_be),
     .sram_gnt_i(sram_gnt),
     .sram_r_rdata_i(sram_r_rdata),
-    .sram_r_valid_i(sram_r_valid),
-
-    .meta_req_o(meta_req_o),
-    .meta_addr_o(meta_addr_o),
-    .meta_wen_o(meta_wen_o),
-    .meta_wdata_o(meta_wdata_o),
-    .meta_be_o(meta_be_o),
-    .meta_gnt_i(meta_gnt_i),
-    .meta_r_rdata_i(meta_r_rdata_i),
-    .meta_r_valid_i(meta_r_valid_i)
+    .sram_r_valid_i(sram_r_valid)
   );
 
   l2_sram_macro #(

@@ -9,10 +9,30 @@
 // specific language governing permissions and limitations under the License.
 
 `ifndef TARGET_FPGA
-  `define SYNOPSYS_MACRO_PRI0 sadclssd4LOW1p256x32m16b1w1c0p1d0l0rm3sdrw01_wrapper
-`endif
+  `define SYNOPSYS_MACRO_128   sadclssd4LOW1p128x32m16b1w1c0p1d0l0rm3sdrw01_wrapper
+  `define SYNOPSYS_MACRO_256   sadclssd4LOW1p256x32m16b1w1c0p1d0l0rm3sdrw01_wrapper
+  `define SYNOPSYS_MACRO_512   sadclssd4LOW1p512x32m16b2w1c0p1d0l0rm3sdrw01_wrapper
+  `define SYNOPSYS_MACRO_1024  sadclssd4LOW1p1024x32m16b2w1c0p1d0l0rm3sdrw01_wrapper
+  `define SYNOPSYS_MACRO_2048  sadclssd4LOW1p2048x32m16b2w1c0p1d0l0rm3sdrw01_wrapper
+  `define SYNOPSYS_MACRO_4096  sadclssd4LOW1p4096x32m16b2w1c0p1d0l0rm3sdrw01_wrapper
+  `define SYNOPSYS_MACRO_8192  sadclssd4LOW1p8192x32m16b2w1c0p1d0l0rm3sdrw01_wrapper
+  `define SYNOPSYS_MACRO_16384 sadclssd4LOW1p16384x32m16b4w1c0p1d0l0rm3sdrw01_wrapper
+  `define SYNOPSYS_MACRO_32768 sadclssd4LOW1p32768x32m16b8w1c0p1d0l0rm3sdrw01_wrapper
 
-// Private bank 0
+  `define INSTANTIATE_SYNOPSYS_SRAM(MACRO_NAME) \
+    MACRO_NAME bank_sram_pri0_i ( \
+        .Q  (r_rdata_o), \
+        .ADR(pri0_address[MACRO_ADDR_WIDTH+1:2]), \
+        .D  (wdata_i), \
+        .WEM(BE_BW_BANK), \
+        .WE (~wen_i), \
+        .ME (req_i), \
+        .CLK(clk_i), \
+        .LS (1'b0), \
+        .DS (1'b0), \
+        .SD (1'b0) \
+    )
+`endif
 
 module buffer_sram_macro #(
   parameter     MACRO_TYPE = "SYNOPSYS",
@@ -60,18 +80,18 @@ module buffer_sram_macro #(
 
   `ifndef TARGET_FPGA  
     if (MACRO_TYPE == "SYNOPSYS") begin : gen_asic_bank
-    `SYNOPSYS_MACRO_PRI0 bank_sram_pri0_i (
-        .Q  (r_rdata_o),
-        .ADR(pri0_address[MACRO_ADDR_WIDTH+2-1:2]),
-        .D  (wdata_i),
-        .WEM(BE_BW_BANK),
-        .WE (~wen_i),
-        .ME (req_i),
-        .CLK(clk_i),
-        .LS(1'b0),
-        .DS(1'b0),
-        .SD(1'b0)
-    );
+      case (MACRO_DEPTH)
+        128:   `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_128);
+        256:   `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_256);
+        512:   `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_512);
+        1024:  `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_1024);
+        2048:  `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_2048);
+        4096:  `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_4096);
+        8192:  `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_8192);
+        16384: `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_16384);
+        32768: `INSTANTIATE_SYNOPSYS_SRAM(`SYNOPSYS_MACRO_32768);
+        default: ;
+      endcase
     end else begin : gen_rtl_bank
       tc_sram #(
         .NumWords(MACRO_DEPTH),

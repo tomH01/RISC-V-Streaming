@@ -1,0 +1,8 @@
+Sensor;Interval;Total Width;Total Height;Block Width (FT);Block Height (FT);Tile Width (FT);Tile Height (FT);Collection Size (FT);Execution Time (FT)
+Front Tele Cam 0;14;640;360;640;8;8;8;64;30
+Front Tele Cam 1;14;640;360;640;8;8;8;64;30
+Long Range Radar;115;240;120;240;8;8;8;64;30
+Corner Radar 0;231;120;120;120;8;8;8;64;30
+Corner Radar 1;231;120;120;120;8;8;8;64;30
+Corner Radar 2;231;120;120;120;8;8;8;64;30
+Corner Radar 3;231;120;120;120;8;8;8;64;30

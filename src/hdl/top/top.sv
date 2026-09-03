@@ -1,4 +1,4 @@
-module top #(
+module top_interleaved #(
   parameter int N_STREAMS           = 4,
   parameter int M_MACROS            = 8,
   parameter int DATA_WIDTH          = 32,
@@ -16,6 +16,7 @@ module top #(
 )(
   input logic clk_i,
   input logic rst_ni,
+  
   // APB Subordinate IF
   input logic                   penable_i,
   input logic                   pwrite_i,
