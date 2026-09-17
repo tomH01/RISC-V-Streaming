@@ -24,8 +24,9 @@ module job_manager #(
   input logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_i [N_STREAMS],
 
   // Control IF
-  input logic [N_STREAMS-1:0]    cfg_push_i,
-  input logic [4*DATA_WIDTH-1:0] cfg_wdata_i   [N_STREAMS],
+  input logic [N_STREAMS-1:0]        cfg_push_i,
+  input logic [STREAM_PTR_WIDTH-1:0] cfg_stream_id_i,
+  input logic [4*DATA_WIDTH-1:0]     cfg_wdata_i,
   
   input logic [ADDR_WIDTH-1:0]   window_size_i [N_STREAMS],
 
@@ -82,6 +83,14 @@ module job_manager #(
     .valid_o(arb_valid)
   );
 
+  logic [N_STREAMS-1:0] cfg_fifo_push;
+  always_comb begin
+    cfg_fifo_push = '0;
+    if (cfg_push_i) begin
+      cfg_fifo_push[cfg_stream_id_i] = 1'b1;
+    end
+  end
+
   generate
     for (genvar i = 0; i < N_STREAMS; i++) begin : gen_fifos
       assign stream_ready_vec[i] = ~notif_empty[i] && (window_size_i[i] != '0);
@@ -110,8 +119,8 @@ module job_manager #(
         .clk_i(clk_i),
         .rst_ni(rst_ni),
 
-        .push_i(cfg_push_i[i]),
-        .data_i(cfg_wdata_i[i]),
+        .push_i(cfg_fifo_push[i]),
+        .data_i(cfg_wdata_i),
         .full_o(),
 
         .pop_i(cfg_pop[i]),

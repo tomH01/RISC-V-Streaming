@@ -58,7 +58,6 @@ async def test_ingress_control(dut):
     
     driver = ControlDriver(dut)
     await driver.reset()
-    assert int(dut.setup_active_o) == 0, f"Expected setup_active_o to be 0 after reset, got: {dut.setup_active_o.value}"
     
     randomizer = ConfigRandomizer(n_streams, m_macros, macro_depth)
     
@@ -72,7 +71,6 @@ async def test_ingress_control(dut):
             await ReadOnly()
             assert dut.stream_en_o[stream_idx].value == stream_en, f"Expected stream_en_o[{stream_idx}] to be {stream_en}, got: {dut.stream_en_o[stream_idx].value}"
             await FallingEdge(dut.clk_i)
-            assert int(dut.setup_active_o) == 1, f"Expected setup_active_o to be 1 after sending first APB, got: {dut.setup_active_o.value}"
             
             await driver.send_ingress_config("window_size", cfg["window_size"], stream_idx)
             await ReadOnly()
@@ -124,14 +122,15 @@ async def test_egress_control(dut):
         await ReadOnly()
         
         if idx == 3:            
-            assert int(dut.cfg_push_o[stream_id].value) == 1, f"Expected push signal to be asserted for stream {stream_id}, got: {dut.cfg_push_o[stream_id].value}"
+            assert int(dut.cfg_push_o.value) == 1, f"Expected push signal to be asserted for stream, got: {dut.cfg_push_o.value}"
+            assert int(dut.cfg_stream_id_o.value) == stream_id, f"Expected cfg_stream_id_o to be {stream_id}, got: {int(dut.cfg_stream_id_o.value)}"
             expected_wdata = int((config[stream_id][0] << 96) | (config[stream_id][1] << 64) | (config[stream_id][2] << 32) | config[stream_id][3])
-            assert int(dut.cfg_wdata_o[stream_id].value) == expected_wdata, f"Expected wdata: {expected_wdata}, got: {int(dut.cfg_wdata_o[stream_id].value)}"
+            assert int(dut.cfg_wdata_o.value) == expected_wdata, f"Expected wdata: {expected_wdata}, got: {int(dut.cfg_wdata_o.value)}"
             await RisingEdge(dut.clk_i)
             await ReadOnly()
-            assert int(dut.cfg_push_o[stream_id].value) == 0, f"Expected push signal to be deasserted for stream {stream_id} after one cycle, got: {dut.cfg_push_o[stream_id].value}"
+            assert int(dut.cfg_push_o.value) == 0, f"Expected push signal to be deasserted for stream after one cycle, got: {dut.cfg_push_o.value}"
         else:
-            assert int(dut.cfg_push_o[stream_id].value) == 0, f"Expected push signal to be deasserted for stream {stream_id}, got: {dut.cfg_push_o[stream_id].value}"
+            assert int(dut.cfg_push_o.value) == 0, f"Expected push signal to be deasserted for stream, got: {dut.cfg_push_o.value}"
         
 @cocotb.test()
 async def test_stream_interval(dut):

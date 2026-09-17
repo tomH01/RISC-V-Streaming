@@ -6,8 +6,9 @@ module control #(
   parameter int MACRO_DEPTH   = 256,
   parameter int B_BANKS       = 2,
 
-  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS),
-  localparam int BANK_PTR_WIDTH  = $clog2(B_BANKS)
+  localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
+  localparam int MACRO_PTR_WIDTH  = (M_MACROS > 1)  ? $clog2(M_MACROS)  : 1,
+  localparam int BANK_PTR_WIDTH   = (B_BANKS > 1)   ? $clog2(B_BANKS)   : 1
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -33,8 +34,9 @@ module control #(
   output logic [MACRO_PTR_WIDTH-1:0] start_macro_o     [N_STREAMS],
 
   // Egress IF
-  output logic [N_STREAMS-1:0]    cfg_push_o,
-  output logic [4*DATA_WIDTH-1:0] cfg_wdata_o [N_STREAMS],
+  output logic [N_STREAMS-1:0]        cfg_push_o,
+  output logic [STREAM_PTR_WIDTH-1:0] cfg_stream_id_o,
+  output logic [4*DATA_WIDTH-1:0]     cfg_wdata_o,
 
   // Topology IF
   output logic [MACRO_PTR_WIDTH-1:0] next_pointer_o [M_MACROS],
@@ -53,10 +55,12 @@ module control #(
   logic [DATA_WIDTH-1:0]      egress_shadow_0_q [N_STREAMS];
   logic [DATA_WIDTH-1:0]      egress_shadow_1_q [N_STREAMS];
   logic [DATA_WIDTH-1:0]      egress_shadow_2_q [N_STREAMS];
-  logic [N_STREAMS-1:0]       cfg_push_q;
-  logic [4*DATA_WIDTH-1:0]    cfg_wdata_q       [N_STREAMS];
 
-  logic [MACRO_PTR_WIDTH-1:0] next_pointer_q    [M_MACROS];
+  logic [N_STREAMS-1:0]        cfg_push_q;
+  logic [STREAM_PTR_WIDTH-1:0] cfg_stream_id_q;
+  logic [4*DATA_WIDTH-1:0]     cfg_wdata_q;
+
+  logic [MACRO_PTR_WIDTH-1:0] next_pointer_q [M_MACROS];
 
   logic [DATA_WIDTH-1:0] stream_interval_q [N_STREAMS];
 
@@ -104,8 +108,9 @@ module control #(
       egress_shadow_0_q <= '{default: '0};
       egress_shadow_1_q <= '{default: '0};
       egress_shadow_2_q <= '{default: '0};
-      cfg_push_q        <= '{default: '0};
-      cfg_wdata_q       <= '{default: '0};
+      cfg_push_q        <= 1'b0;
+      cfg_stream_id_q   <= '0;
+      cfg_wdata_q       <= '0;
 
       next_pointer_q    <= '{default: '0};
 
@@ -134,8 +139,9 @@ module control #(
             5'h14: egress_shadow_1_q[stream_idx] <= pwdata_i;
             5'h18: egress_shadow_2_q[stream_idx] <= pwdata_i;
             5'h1C: begin
-              cfg_push_q[stream_idx]  <= 1'b1;
-              cfg_wdata_q[stream_idx] <= {egress_shadow_0_q[stream_idx], egress_shadow_1_q[stream_idx], egress_shadow_2_q[stream_idx], pwdata_i};
+              cfg_push_q      <= 1'b1;
+              cfg_stream_id_q <= STREAM_PTR_WIDTH'(stream_idx);
+              cfg_wdata_q     <= {egress_shadow_0_q[stream_idx], egress_shadow_1_q[stream_idx], egress_shadow_2_q[stream_idx], pwdata_i};
             end
             default: ;
           endcase
@@ -168,8 +174,10 @@ module control #(
   assign stream_en_o   = stream_en_q | {N_STREAMS{dma_enable_o}};
   assign start_macro_o = start_macro_q;
   assign window_size_o = window_size_q;
-  assign cfg_push_o    = cfg_push_q;
-  assign cfg_wdata_o   = cfg_wdata_q;
+
+  assign cfg_push_o      = cfg_push_q;
+  assign cfg_stream_id_o = cfg_stream_id_q;
+  assign cfg_wdata_o     = cfg_wdata_q;
 
   assign next_pointer_o = next_pointer_q;
 

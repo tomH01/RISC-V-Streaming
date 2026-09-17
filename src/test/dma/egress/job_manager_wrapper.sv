@@ -5,8 +5,8 @@ module job_manager_wrapper #(
   parameter int ADDR_WIDTH    = 32,
   parameter int FIFO_DEPTH    = 8,
 
-  localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1
+  localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
+  localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS)
 )(
   input logic clk_i,
   input logic rst_ni,
@@ -22,8 +22,9 @@ module job_manager_wrapper #(
   input logic [MACRO_PTR_WIDTH-1:0] notif_start_macro_i [N_STREAMS],
 
   // Control IF
-  input logic [N_STREAMS-1:0]    cfg_push_i,
-  input logic [4*DATA_WIDTH-1:0] cfg_wdata_i   [N_STREAMS],
+  input logic [N_STREAMS-1:0]        cfg_push_i,
+  input logic [STREAM_PTR_WIDTH-1:0] cfg_stream_id_i,
+  input logic [4*DATA_WIDTH-1:0]     cfg_wdata_i,
   
   input logic [ADDR_WIDTH-1:0]   window_size_i [N_STREAMS],
 
@@ -64,6 +65,7 @@ module job_manager_wrapper #(
     .notif_start_macro_i(notif_start_macro_i),
 
     .cfg_push_i(cfg_push_i),
+    .cfg_stream_id_i(cfg_stream_id_i),
     .cfg_wdata_i(cfg_wdata_i),
     
     .window_size_i(window_size_i),

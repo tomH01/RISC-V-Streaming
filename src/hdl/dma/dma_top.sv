@@ -9,8 +9,9 @@ module dma_top #(
   parameter int BANK_DEPTH          = 16384,
   parameter int STREAM_OFFSET_WIDTH = 10,
 
+  localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
+  localparam int BANK_PTR_WIDTH   = (B_BANKS > 1) ? $clog2(B_BANKS) : 1,
   localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
   localparam int DMA_MANAGERS     = W_WORKERS
 )(
@@ -66,15 +67,16 @@ module dma_top #(
   // #######
   // Control
 
-  logic                       cfg_egress_enable; 
-  logic [DATA_WIDTH-1:0]      cfg_l2_bank_base;
-  logic [N_STREAMS-1:0]       cfg_stream_en;
-  logic [DATA_WIDTH-1:0]      cfg_stream_interval [N_STREAMS];
-  logic [ADDR_WIDTH-1:0]      cfg_window_size     [N_STREAMS];
-  logic [MACRO_PTR_WIDTH-1:0] cfg_start_macro     [N_STREAMS];
-  logic [N_STREAMS-1:0]       cfg_push;   
-  logic [4*DATA_WIDTH-1:0]    cfg_wdata           [N_STREAMS];
-  logic [MACRO_PTR_WIDTH-1:0] cfg_next_pointer    [M_MACROS];
+  logic                        cfg_egress_enable; 
+  logic [DATA_WIDTH-1:0]       cfg_l2_bank_base;
+  logic [N_STREAMS-1:0]        cfg_stream_en;
+  logic [DATA_WIDTH-1:0]       cfg_stream_interval [N_STREAMS];
+  logic [ADDR_WIDTH-1:0]       cfg_window_size     [N_STREAMS];
+  logic [MACRO_PTR_WIDTH-1:0]  cfg_start_macro     [N_STREAMS];
+  logic [N_STREAMS-1:0]        cfg_push;   
+  logic [STREAM_PTR_WIDTH-1:0] cfg_stream_id;
+  logic [4*DATA_WIDTH-1:0]     cfg_wdata;
+  logic [MACRO_PTR_WIDTH-1:0]  cfg_next_pointer    [M_MACROS];
 
   control #(
     .N_STREAMS(N_STREAMS),
@@ -105,6 +107,7 @@ module dma_top #(
     .start_macro_o(cfg_start_macro),
 
     .cfg_push_o(cfg_push),
+    .cfg_stream_id_o(cfg_stream_id),
     .cfg_wdata_o(cfg_wdata),
 
     .next_pointer_o(cfg_next_pointer),
@@ -228,6 +231,7 @@ module dma_top #(
 
     .job_dispatched_o(job_dispatched_o),
     .cfg_push_i(cfg_push),
+    .cfg_stream_id_i(cfg_stream_id),
     .cfg_wdata_i(cfg_wdata),
 
     .meta_req_i(meta_req_i),

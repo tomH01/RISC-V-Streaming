@@ -22,9 +22,11 @@ class JobManagerDriver:
         for s in range(self.n_streams):      
             self.dut.notif_valid_i[s].value = 0
             self.dut.notif_start_macro_i[s].value = 0
-            self.dut.cfg_push_i[s].value = 0
-            self.dut.cfg_wdata_i[s].value = 0
             self.dut.window_size_i[s].value = 0
+        
+        self.dut.cfg_push_i.value = 0
+        self.dut.cfg_stream_id_i.value = 0
+        self.dut.cfg_wdata_i.value = 0
         
         self.dut.job_ready_i.value = 0
             
@@ -41,11 +43,10 @@ class JobManagerDriver:
         self.dut.notif_start_macro_i[stream_id].value = start_macro
         
     async def send_configuration(self, stream_id, cfg_dict):
-        
-        self.dut.cfg_push_i[stream_id].value = 1
-        
+        self.dut.cfg_push_i.value = 1
+        self.dut.cfg_stream_id_i.value = stream_id
         cfg = int(cfg_dict["mode"] << 124) | int(cfg_dict["apply_count"] << 112) | int(cfg_dict["window_id"] << 96) | cfg_dict["payload"]
-        self.dut.cfg_wdata_i[stream_id].value = cfg
+        self.dut.cfg_wdata_i.value = cfg
     
     @staticmethod
     def get_rnd_window_id(current_window_id):
@@ -136,8 +137,8 @@ class GoldenModel:
                 st['current_window_id'] += 1
                 
             for s in range(self.n_streams):
-                if self.dut.cfg_push_i[s].value == 1:
-                    val = int(self.dut.cfg_wdata_i[s].value)
+                if self.dut.cfg_push_i.value == 1 and int(self.dut.cfg_stream_id_i.value) == s:
+                    val = int(self.dut.cfg_wdata_i.value)
                     self.state[s]['cfg_fifo'].append({
                         'mode': (val >> 124) & 0xF,
                         'apply_count': (val >> 112) & 0xFFF,
@@ -256,7 +257,7 @@ async def test_job_manager_crv(dut):
             
             for s in range(n_streams):
                 dut.notif_valid_i[s].value = 0
-                dut.cfg_push_i[s].value = 0
+                dut.cfg_push_i.value = 0
             
             dut.job_ready_i.value = rnd.randint(0, 1)
             

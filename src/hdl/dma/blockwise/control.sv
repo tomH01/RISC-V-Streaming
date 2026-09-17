@@ -66,8 +66,6 @@ module control #(
 
   logic [DATA_WIDTH-1:0] stream_interval_q [N_STREAMS];
 
-  logic setup_active_q;
-
   logic  is_apb_space;
   assign is_apb_space = (paddr_i[27] == 1'b1);
 
@@ -110,7 +108,6 @@ module control #(
       l2_bank_base_q       <= '0;
       bank_header_size_b_q <= '0; 
       bank_owner_q         <= '0;
-      setup_active_q       <= '0;
 
       start_macro_q     <= '{default: '0};
       window_size_q     <= '{default: '0};

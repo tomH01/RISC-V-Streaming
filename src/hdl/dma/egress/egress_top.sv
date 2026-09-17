@@ -40,8 +40,10 @@ module egress_top #(
   input logic [MACRO_PTR_WIDTH-1:0] next_pointer_i [M_MACROS],
 
   output logic                    job_dispatched_o,
-  input  logic [N_STREAMS-1:0]    cfg_push_i,
-  input  logic [4*DATA_WIDTH-1:0] cfg_wdata_i [N_STREAMS],
+
+  input  logic [N_STREAMS-1:0]        cfg_push_i,
+  input  logic [STREAM_PTR_WIDTH-1:0] cfg_stream_id_i,
+  input  logic [4*DATA_WIDTH-1:0]     cfg_wdata_i,
 
   // Meta IF
   input  logic                        meta_req_i,
@@ -111,6 +113,7 @@ module egress_top #(
     .notif_start_macro_i(notif_start_macro_i),
 
     .cfg_push_i(cfg_push_i),
+    .cfg_stream_id_i(cfg_stream_id_i),
     .cfg_wdata_i(cfg_wdata_i),
 
     .window_size_i(window_size_i),
