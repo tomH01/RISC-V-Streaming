@@ -1,8 +1,8 @@
 dict set ::params N_STREAMS 7
-dict set ::params M_MACROS 64
+dict set ::params M_MACROS 32
 dict set ::params DATA_WIDTH 32
 dict set ::params ADDR_WIDTH 32
-dict set ::params MACRO_DEPTH 512
+dict set ::params MACRO_DEPTH 1024
 dict set ::params B_BANKS 8
 dict set ::params DEPTH 8
 dict set ::params NUM_REQS 4

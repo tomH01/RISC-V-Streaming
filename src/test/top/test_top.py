@@ -22,8 +22,10 @@ from dma_driver import DMAInterleavedDriver
 
 from data_drivers import OBIDriver
 from sensor_set import SensorSet
-from utils.python.cocotb import get_design_parameters
 from cpu_state import CPUOp
+from data_logger import PerformanceLogger
+
+from utils.python.cocotb import get_design_parameters
 
 params = get_design_parameters()    
 
@@ -202,6 +204,12 @@ async def test_top(dut):
                 #print(f"Cycle {cycle}: Wrote CPU Done Ptr: {dma_driver.cpu_done_ptr}")
                 
     await dma_driver.toggle_dma_enable(False)
-    print(await ctrl_driver.fetch_all_perf_counters())
+    counters = await ctrl_driver.fetch_all_perf_counters()    
+    
+    performance_logger = PerformanceLogger(
+        log_dir="/local/hageltom/teda/bottles/risc-v-streaming/results/perf_logs", 
+        filename_prefix="perf_counters_"
+    )
+    performance_logger.dump_perf_counters(counters)
                     
     

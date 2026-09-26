@@ -10,6 +10,7 @@
 set tools [list \
   "src/test/tools/addr_generator_models.py" \
   "src/test/tools/config_randomizer.py" \
+  "src/test/tools/data_logger.py" \
 ]
 
 set drivers [list \
