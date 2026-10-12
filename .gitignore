@@ -1,4 +1,5 @@
 output/
+results/
 backup/
 output*/
 __pycache__

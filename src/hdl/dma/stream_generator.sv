@@ -9,11 +9,12 @@ module stream_generator #(
   // Stream IF
   output logic [DATA_WIDTH-1:0] stream_data_o  [N_STREAMS],
   output logic [N_STREAMS-1:0]  stream_valid_o,
-  input logic  [N_STREAMS-1:0]  stream_ready_i,
+  input  logic [N_STREAMS-1:0]  stream_ready_i,
+  output logic [N_STREAMS-1:0]  drop_evt_o,
 
   // Control IF
   input logic [N_STREAMS-1:0]  stream_en_i,
-  input logic [DATA_WIDTH-1:0] stream_interval_i [N_STREAMS]
+  input logic [DATA_WIDTH-1:0] stream_interval_i [N_STREAMS]  
 );
 
   localparam [DATA_WIDTH-1:0] STREAM_OFFSET_STEP = (1 << STREAM_OFFSET_WIDTH);
@@ -22,17 +23,20 @@ module stream_generator #(
     logic [DATA_WIDTH-1:0] data_cnt_q,     data_cnt_d;
     logic [DATA_WIDTH-1:0] interval_cnt_q, interval_cnt_d;
     logic                  valid_q,        valid_d;
+    logic                  drop_evt;
 
     localparam logic [DATA_WIDTH-1:0] START_VAL = (i * STREAM_OFFSET_STEP);
     localparam logic [DATA_WIDTH-1:0] END_VAL   = START_VAL + STREAM_OFFSET_STEP - 1;
 
     assign stream_data_o[i]     = data_cnt_q;
     assign stream_valid_o[i]    = valid_q && stream_en_i[i];
+    assign drop_evt_o[i]        = drop_evt;
 
     always_comb begin
       data_cnt_d     = data_cnt_q;
       interval_cnt_d = interval_cnt_q;
       valid_d        = valid_q;
+      drop_evt       = 1'b0;
 
       if (stream_en_i[i]) begin
         if (valid_q && stream_ready_i[i]) begin
@@ -40,10 +44,13 @@ module stream_generator #(
         end
 
         if ((stream_interval_i[i] <= 1) || (interval_cnt_q >= stream_interval_i[i] - 1)) begin
-          valid_d = 1'b1;
-          
+          valid_d        = 1'b1;
           data_cnt_d     = (data_cnt_q == END_VAL) ? START_VAL : data_cnt_q + 1;
           interval_cnt_d = '0;
+
+          if (valid_q && !stream_ready_i[i]) begin
+            drop_evt = 1'b1;
+          end  
         end else begin
           interval_cnt_d = interval_cnt_q + 1;
         end

@@ -88,15 +88,29 @@ async def test_top(dut):
     active_exec_pipeline = []
     pending_reads = []
     
+    block_tracker = {
+        stream.id: {
+            "ingress": [],
+            "egress": []
+        } for stream in sensor_set.streams
+    }
+    
     num_reads = 0    
     trials = 0
     
-    MAX_CYCLES = 3500000
+    MAX_CYCLES = 500000
+    #MAX_CYCLES = 250000
     for cycle in range(MAX_CYCLES):
         if cycle % 100000 == 0:
             print(f"Cycle {cycle}")
         
         await ReadOnly()
+        
+        ingress_notif = int(dut.u_dma_top.notif_valid.value)
+        if ingress_notif:
+            for stream_id in range(n_streams):
+                if (ingress_notif >> stream_id) & 1:
+                    block_tracker[stream_id]["ingress"].append(cycle)               
         
         is_stalled = dut.data_req_i.value == 1 and dut.data_gnt_o.value == 0
         
@@ -106,12 +120,9 @@ async def test_top(dut):
         for exec in finished_execs:
             _, stream_id, cpu_done_ptr = exec
             stream = sensor_set.streams[stream_id]
-            #print(f"Cycle {cycle}: Stream {stream_id} completed execution, CPU done ptr: {cpu_done_ptr}")
             for job in stream.jobs:
-                expected_end = (job['start'] + job['size'] - data_width_b) % dma_driver.sram_size_b
-                actual_done = cpu_done_ptr
-
-                if not job['exec'] and expected_end == actual_done:
+                dist = DMAInterleavedDriver.get_ring_dist(job['start'], cpu_done_ptr, dma_driver.sram_size_b)
+                if not job['exec'] and dist >= (job['size'] - data_width_b):
                     job['exec'] = True
                     dma_driver.agu_done_ptrs[stream_id] = -1
                     print(f"Cycle {cycle}: Stream {stream_id} completed job starting at {job['start']} with size {job['size']}")
@@ -122,8 +133,10 @@ async def test_top(dut):
         if int(dut.data_r_valid_o.value) == 1:
             assert len(pending_reads) > 0, "Data valid without pending read existing"
             state, meta_data = pending_reads.pop(0)
-            data = int(dut.data_r_rdata_o.value)
             
+            rdata_raw = dut.data_r_rdata_o.value
+            data = int(rdata_raw)
+                
             match state:
                 case CPUOp.READ_FIFO:
                     print(f"Cycle {cycle}: Read FIFO data: {data}")
@@ -135,7 +148,8 @@ async def test_top(dut):
                         'exec': False
                     })
                     dma_driver.alloc_ptr = (dma_driver.alloc_ptr + size * dma_driver.data_width_b) % dma_driver.sram_size_b
-                    print(f"Cycle {cycle}: Dispatched job for stream {stream_id}, size: {size}, alloc_ptr: {dma_driver.alloc_ptr}")  
+                    print(f"Cycle {cycle}: Dispatched job for stream {stream_id}, size: {size}, alloc_ptr: {dma_driver.alloc_ptr}")
+                    block_tracker[stream_id]["egress"].append(cycle)                      
                 
                 case CPUOp.READ_AGU_DONE_PTR:
                     stream_id = meta_data
@@ -200,16 +214,16 @@ async def test_top(dut):
                     pending_reads.append(read_meta)    
                     
             case CPUOp.WRITE_CPU_DONE_PTR:
-                await dma_driver.write_cpu_done_ptr(dma_driver.cpu_done_ptr)
-                #print(f"Cycle {cycle}: Wrote CPU Done Ptr: {dma_driver.cpu_done_ptr}")
+                dma_driver.write_cpu_done_ptr(dma_driver.cpu_done_ptr)
+                print(f"Cycle {cycle}: Wrote CPU Done Ptr: {dma_driver.cpu_done_ptr}")
                 
     await dma_driver.toggle_dma_enable(False)
     counters = await ctrl_driver.fetch_all_perf_counters()    
     
     performance_logger = PerformanceLogger(
         log_dir="/local/hageltom/teda/bottles/risc-v-streaming/results/perf_logs", 
-        filename_prefix="perf_counters_"
+        filename_prefix="perf_w223_il_"
     )
     performance_logger.dump_perf_counters(counters)
+    performance_logger.dump_latencies(block_tracker)
                     
-    

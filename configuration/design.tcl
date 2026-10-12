@@ -231,6 +231,11 @@ $memory_simple addPythonSimFiles [concat [list \
 # Egress
 # ------
 
+set egress_top [EDA::Design::createComponent egress_top]
+
+$egress_top addHDLSourceFiles $egress_hdl
+
+
 set job_manager_wrapper [EDA::Design::createComponent job_manager_wrapper]
 
 $job_manager_wrapper addHDLSourceFiles [list \

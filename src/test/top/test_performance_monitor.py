@@ -11,7 +11,7 @@ from cocotb.clock import Clock
 
 from utils.python.cocotb import get_design_parameters
 
-from bus_drivers import APBDriver
+from ctrl_drivers import APBDriver
 params = get_design_parameters()
 
 
@@ -33,6 +33,7 @@ class PerformanceMonitorDriver:
         
         self.dut.ingr_stm_in_valid_i.value = 0
         self.dut.ingr_stm_in_ready_i.value = 0
+        self.dut.ingr_stm_drop_evt_i.value = 0
         
         self.dut.egr_job_req_valid_i.value = 0
         self.dut.egr_job_req_ready_i.value = 0
@@ -60,7 +61,8 @@ class PerformanceMonitorDriver:
         
         self.dut.ingr_stm_in_valid_i.value = int(rnd.getrandbits(self.n_streams))
         self.dut.ingr_stm_in_ready_i.value = int(rnd.getrandbits(self.n_streams))    
-        
+        self.dut.ingr_stm_drop_evt_i.value = int(rnd.getrandbits(self.n_streams))
+
         self.dut.egr_job_req_valid_i.value  = rnd.randint(0, 1)
         self.dut.egr_job_req_ready_i.value = rnd.randint(0, 1)
         self.dut.egr_meta_disp_valid_i.value = rnd.randint(0, 1)
@@ -112,17 +114,21 @@ class GoldenModel:
             0x009: 0  # cpu_meta_bp
         }
         
-        # Streams (Start bei 0x040)
+        # Streams
         for i in range(self.n_streams):
             self.counters[0x040 + 2 * i]     = 0 # HS
             self.counters[0x040 + 2 * i + 1] = 0 # BP
 
-        # Workers (Start bei 0x080)
+        # Workers
         for w in range(self.w_workers):
             self.counters[0x080 + 4 * w]     = 0 # BP HS
             self.counters[0x080 + 4 * w + 1] = 0 # BP BP
             self.counters[0x080 + 4 * w + 2] = 0 # BUS HS
             self.counters[0x080 + 4 * w + 3] = 0 # BUS BP
+            
+        # Ingress Stream Drop
+        for i in range(self.n_streams):
+            self.counters[0x0C0 + i] = 0 # Drop
         
     async def run(self):
         while True:
@@ -148,11 +154,15 @@ class GoldenModel:
                 for s in range(self.n_streams):
                     stm_in_valid = int(self.dut.ingr_stm_in_valid_i[s].value)
                     stm_in_ready = int(self.dut.ingr_stm_in_ready_i[s].value)
+                    stm_drop_evt = int(self.dut.ingr_stm_drop_evt_i[s].value)
                     
                     if stm_in_valid and stm_in_ready:
                         self.next_counters[0x040 + 2 * s] += 1
                     elif stm_in_valid and not stm_in_ready:
                         self.next_counters[0x040 + 2 * s + 1] += 1
+                        
+                    if stm_drop_evt:
+                        self.next_counters[0x0C0 + s] += 1
                 
                 # Egress
                 job_valid = int(self.dut.egr_job_req_valid_i.value)
@@ -250,6 +260,7 @@ async def test_performance_monitor_crv(dut):
     for s in range(n_streams):
         valid_word_offsets.append(0x040 + 2 * s)
         valid_word_offsets.append(0x040 + 2 * s + 1)
+        valid_word_offsets.append(0x0C0 + s)
     for w in range(w_workers):
         valid_word_offsets.append(0x080 + 4 * w)
         valid_word_offsets.append(0x080 + 4 * w + 1)

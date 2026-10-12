@@ -1,5 +1,6 @@
 import os
 import csv
+from itertools import zip_longest
 
 from utils.python.cocotb import get_design_parameters
 
@@ -24,7 +25,9 @@ class PerformanceLogger:
         if counters is None:
             raise ValueError("Counters dictionary is None")
         
-        file_path = os.path.join(self.log_dir, self._gen_csv_filename())
+        base_name = self._gen_csv_filename()
+        filename = base_name.replace("perf", "perf_counters")
+        file_path = os.path.join(self.log_dir, filename)
         
         row_data = {
             "N_STREAMS": self.n_streams,
@@ -40,6 +43,32 @@ class PerformanceLogger:
             writer = csv.DictWriter(f, fieldnames=list(row_data.keys()))
             writer.writeheader()
             writer.writerow(row_data)
+            
+    def dump_latencies(self, block_tracker):
+        if not block_tracker:
+            return
+
+        stream_latencies = {}
+        for stream_id, phases in block_tracker.items():
+            ingress_list = phases.get("ingress", [])
+            egress_list = phases.get("egress", [])
+            
+            latencies = [eg - ig for ig, eg in zip(ingress_list, egress_list)]
+            stream_latencies[f"stream_{stream_id}_latency"] = latencies
+
+        base_name = self._gen_csv_filename()
+        filename = base_name.replace("perf", "perf_latencies")
+        file_path = os.path.join(self.log_dir, filename)
+
+        fieldnames = list(stream_latencies.keys())
+        
+        columns = list(stream_latencies.values())
+        rows = zip_longest(*columns, fillvalue="")
+
+        with open(file_path, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(fieldnames)
+            writer.writerows(rows)
         
     def _gen_csv_filename(self):
         return (

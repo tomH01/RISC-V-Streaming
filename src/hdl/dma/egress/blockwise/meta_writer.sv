@@ -4,7 +4,7 @@ module meta_writer #(
   parameter int B_BANKS       = 2,
   parameter int BANK_DEPTH    = 8192,
 
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
+  localparam int BANK_PTR_WIDTH   = (B_BANKS > 1) ? $clog2(B_BANKS) : 1,
   localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
   localparam int BANK_SIZE_BYTES  = BANK_DEPTH * DATA_WIDTH_BYTES
 )(

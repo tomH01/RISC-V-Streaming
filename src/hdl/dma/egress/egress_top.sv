@@ -11,7 +11,6 @@ module egress_top #(
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
   localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
   localparam int DMA_MANAGERS     = W_WORKERS
 )(

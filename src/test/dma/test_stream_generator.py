@@ -49,14 +49,24 @@ class GoldenModel:
         self.score_board = score_board
         
         self.n_streams = int(params["N_STREAMS"])
+        self.data_width = int(params["DATA_WIDTH"])
+        self.offset_width = int(params["STREAM_OFFSET_WIDTH"])
 
-        stream_offset_step = 1 <<  int(params["STREAM_OFFSET_WIDTH"])
-        self.state = [{
-            "data_counter": n * stream_offset_step,
-            "drop_counter": 0,
-            "has_valid_word": False
-        } for n in range(self.n_streams)]
-            
+        self.state = []
+
+        stream_offset_step = 1 <<  self.offset_width
+        
+        for n in range(self.n_streams):
+            start_val = n * stream_offset_step
+            end_val = start_val + stream_offset_step - 1
+            self.state.append({
+                "data_counter": start_val,
+                "start_val": start_val,
+                "end_val": end_val,
+                "has_valid_word": False
+            })
+       
+    """     
     async def run(self, stream_id, interval):
         state = self.state[stream_id]
         interval_count = 0
@@ -84,6 +94,41 @@ class GoldenModel:
             
             else:
                 interval_count += 1   
+    """
+                
+    async def run(self, stream_id, interval):
+        state = self.state[stream_id]
+        interval_count = 0
+        
+        while True:      
+            await RisingEdge(self.dut.clk_i)
+            await ReadOnly()
+                
+            if self.dut.stream_en_i[stream_id].value == 0:
+                state["has_valid_word"] = False
+                interval_count = 0
+                continue
+
+            consumed_this_cycle = False
+            if state["has_valid_word"] and self.dut.stream_ready_i[stream_id].value == 1:
+                self.score_board.add_expected_data(stream_id, state["data_counter"])
+                state["has_valid_word"] = False
+                consumed_this_cycle = True
+                
+            if interval <= 1 or interval_count >= interval - 1:
+                interval_count = 0
+                
+                if state["has_valid_word"] and not consumed_this_cycle:
+                    self.score_board.add_expected_drop(stream_id)
+
+                if state["data_counter"] == state["end_val"]:
+                    state["data_counter"] = state["start_val"]
+                else:
+                    state["data_counter"] += 1
+                
+                state["has_valid_word"] = True
+            else:
+                interval_count += 1
     
     
 class OutputMonitor:
@@ -101,7 +146,10 @@ class OutputMonitor:
             if self.dut.stream_valid_o[self.stream_id].value == 1 \
             and self.dut.stream_ready_i[self.stream_id].value == 1:  
                 actual_value = int(self.dut.stream_data_o[self.stream_id].value)              
-                self.score_board.add_actual(self.stream_id, actual_value)
+                self.score_board.add_actual_data(self.stream_id, actual_value)
+                
+            if self.dut.drop_evt_o[self.stream_id].value == 1:
+                self.score_board.add_actual_drop(self.stream_id)
         
         
 class Scoreboard:
@@ -112,12 +160,21 @@ class Scoreboard:
         
         self.expected_q = [Queue() for _ in range(self.n_streams)]
         self.actual_q = [Queue() for _ in range(self.n_streams)]
+        
+        self.expected_drop_q = [Queue() for _ in range(self.n_streams)]
+        self.actual_drop_q = [Queue() for _ in range(self.n_streams)]
 
-    def add_expected(self, stream_id, value):
+    def add_expected_data(self, stream_id, value):
         self.expected_q[stream_id].put_nowait(value)
         
-    def add_actual(self, stream_id, value):
+    def add_actual_data(self, stream_id, value):
         self.actual_q[stream_id].put_nowait(value)
+        
+    def add_expected_drop(self, stream_id):
+        self.expected_drop_q[stream_id].put_nowait(1)
+        
+    def add_actual_drop(self, stream_id):
+        self.actual_drop_q[stream_id].put_nowait(1)
         
     async def compare(self, stream_id):
         while True:
@@ -128,14 +185,23 @@ class Scoreboard:
                 await RisingEdge(self.dut.clk_i)
                 
             assert exp == act, f"Stream {stream_id}: Expected {exp}, got {act}"
+            
+    async def compare_drop(self, stream_id):
+        while True:
+            exp = await self.expected_drop_q[stream_id].get()
+            act = await self.actual_drop_q[stream_id].get()
+                
+            assert exp == act, f"Stream {stream_id}: Expected drop {exp}, got {act}"
                     
     async def run(self):
         for n in range(self.n_streams):
             cocotb.start_soon(self.compare(n))
+            cocotb.start_soon(self.compare_drop(n))
             
     async def wait_for_empty(self):
         for n in range(self.n_streams):
-            while not self.expected_q[n].empty() or not self.actual_q[n].empty():
+            while not self.expected_q[n].empty() or not self.actual_q[n].empty() \
+            or not self.expected_drop_q[n].empty() or not self.actual_drop_q[n].empty():
                 await RisingEdge(self.dut.clk_i)
 
 

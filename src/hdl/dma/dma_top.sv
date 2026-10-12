@@ -53,6 +53,7 @@ module dma_top #(
 
   output logic [N_STREAMS-1:0] perf_ingr_stm_in_valid_o,
   output logic [N_STREAMS-1:0] perf_ingr_stm_in_ready_o,
+  output logic [N_STREAMS-1:0] perf_ingr_stm_drop_evt_o,
   
   output logic                 perf_egr_job_req_valid_o,
   output logic                 perf_egr_job_req_ready_o,
@@ -134,6 +135,7 @@ module dma_top #(
     .stream_data_o(stream_data),
     .stream_valid_o(stream_valid),
     .stream_ready_i(stream_ready),
+    .drop_evt_o(perf_ingr_stm_drop_evt_o),
 
     .stream_en_i(cfg_stream_en),
     .stream_interval_i(cfg_stream_interval)

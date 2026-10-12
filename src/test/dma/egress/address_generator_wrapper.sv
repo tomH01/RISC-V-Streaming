@@ -8,7 +8,7 @@ module address_generator_wrapper #(
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS)
+  localparam int BANK_PTR_WIDTH   = (B_BANKS > 1)   ? $clog2(B_BANKS)   : 1
 )(
   input logic clk_i,
   input logic rst_ni,

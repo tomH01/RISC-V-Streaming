@@ -2,7 +2,7 @@ interface meta_if #(
   parameter int DATA_WIDTH    = 32,
   parameter int B_BANKS       = 8,
 
-  localparam int BANK_PTR_WIDTH  = $clog2(B_BANKS)
+  localparam int BANK_PTR_WIDTH  = (B_BANKS > 1) ? $clog2(B_BANKS) : 1
 );
 
   typedef struct packed {

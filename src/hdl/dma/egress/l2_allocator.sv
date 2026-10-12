@@ -6,7 +6,7 @@ module l2_allocator #(
   parameter int BANK_DEPTH    = 8192,
 
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
+  localparam int BANK_PTR_WIDTH   = (B_BANKS > 1)   ? $clog2(B_BANKS)   : 1,
   localparam int DATA_WIDTH_BYTES = DATA_WIDTH / 8,
   localparam int SRAM_SIZE_B      = B_BANKS * BANK_DEPTH * DATA_WIDTH_BYTES,
   localparam int RING_PTR_WIDTH   = $clog2(SRAM_SIZE_B),

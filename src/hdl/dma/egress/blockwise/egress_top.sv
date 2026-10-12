@@ -11,7 +11,6 @@ module egress_top #(
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
   localparam int STREAM_PTR_WIDTH = (N_STREAMS > 1) ? $clog2(N_STREAMS) : 1,
   localparam int WORKER_PTR_WIDTH = (W_WORKERS > 1) ? $clog2(W_WORKERS) : 1,
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
   localparam int META_MASTER      = 1,
   localparam int NUM_MASTERS      = W_WORKERS + META_MASTER,
   localparam int META_WRT_BUS_IDX = NUM_MASTERS - META_MASTER

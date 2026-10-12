@@ -8,36 +8,37 @@ module performance_monitor #(
   input logic rst_ni,
 
   // APB Subordinate IF
-  input logic                   penable_i,
-  input logic                   pwrite_i,
-  input logic  [ADDR_WIDTH-1:0] paddr_i,
-  input logic                   psel_i,
-  input logic  [DATA_WIDTH-1:0] pwdata_i,
+  input  logic                   penable_i,
+  input  logic                   pwrite_i,
+  input  logic  [ADDR_WIDTH-1:0] paddr_i,
+  input  logic                   psel_i,
+  input  logic  [DATA_WIDTH-1:0] pwdata_i,
   output logic [DATA_WIDTH-1:0] prdata_o,
   output logic                  pready_o,
   output logic                  pslverr_o,
 
   // DMA IF
-  input  logic                 dma_enable_i,
-  input  logic                 dma_setup_start_i,
+  input logic                 dma_enable_i,
+  input logic                 dma_setup_start_i,
 
-  input  logic [N_STREAMS-1:0] ingr_stm_in_valid_i,
-  input  logic [N_STREAMS-1:0] ingr_stm_in_ready_i,
+  input logic [N_STREAMS-1:0] ingr_stm_in_valid_i,
+  input logic [N_STREAMS-1:0] ingr_stm_in_ready_i,
+  input logic [N_STREAMS-1:0] ingr_stm_drop_evt_i,
 
-  input  logic                 egr_job_req_valid_i,
-  input  logic                 egr_job_req_ready_i,
-  input  logic                 egr_meta_disp_valid_i,
-  input  logic                 egr_meta_disp_ready_i,
-  input  logic [W_WORKERS-1:0] egr_wkr_bp_req_i,
-  input  logic [W_WORKERS-1:0] egr_wkr_bp_gnt_i,
-  input  logic [W_WORKERS-1:0] egr_wkr_bus_valid_i,
-  input  logic [W_WORKERS-1:0] egr_wkr_bus_ready_i,
+  input logic                 egr_job_req_valid_i,
+  input logic                 egr_job_req_ready_i,
+  input logic                 egr_meta_disp_valid_i,
+  input logic                 egr_meta_disp_ready_i,
+  input logic [W_WORKERS-1:0] egr_wkr_bp_req_i,
+  input logic [W_WORKERS-1:0] egr_wkr_bp_gnt_i,
+  input logic [W_WORKERS-1:0] egr_wkr_bus_valid_i,
+  input logic [W_WORKERS-1:0] egr_wkr_bus_ready_i,
 
   // CPU IF
-  input  logic                 cpu_l2_valid_i,
-  input  logic                 cpu_l2_ready_i,
-  input  logic                 cpu_meta_req_i,
-  input  logic                 cpu_meta_gnt_i
+  input logic                 cpu_l2_valid_i,
+  input logic                 cpu_l2_ready_i,
+  input logic                 cpu_meta_req_i,
+  input logic                 cpu_meta_gnt_i
 );
 
   logic                  dma_enable_q;
@@ -45,7 +46,8 @@ module performance_monitor #(
   logic [DATA_WIDTH-1:0] run_cnt_q;
 
   logic [DATA_WIDTH-1:0] ingr_stm_in_hs_cnt_q [N_STREAMS], 
-                         ingr_stm_in_bp_cnt_q [N_STREAMS];
+                         ingr_stm_in_bp_cnt_q [N_STREAMS],
+                         ingr_stm_drop_evt_q  [N_STREAMS];
   logic [DATA_WIDTH-1:0] egr_job_req_hs_cnt_q, 
                          egr_job_req_bp_cnt_q;
   logic [DATA_WIDTH-1:0] egr_meta_disp_hs_cnt_q, 
@@ -80,12 +82,17 @@ module performance_monitor #(
     if (!rst_ni) begin
         ingr_stm_in_hs_cnt_q <= '{default: '0};
         ingr_stm_in_bp_cnt_q <= '{default: '0};
+        ingr_stm_drop_evt_q  <= '{default: '0};
     end else if (dma_enable_i) begin
       for (int i = 0; i < N_STREAMS; i++) begin
         if (ingr_stm_in_valid_i[i] && ingr_stm_in_ready_i[i]) begin
           ingr_stm_in_hs_cnt_q[i] <= ingr_stm_in_hs_cnt_q[i] + 1;
         end else if (ingr_stm_in_valid_i[i] && !ingr_stm_in_ready_i[i]) begin
           ingr_stm_in_bp_cnt_q[i] <= ingr_stm_in_bp_cnt_q[i] + 1;
+        end
+
+        if (ingr_stm_drop_evt_i[i]) begin
+          ingr_stm_drop_evt_q[i] <= ingr_stm_drop_evt_q[i] + 1;
         end
       end
     end
@@ -165,6 +172,7 @@ module performance_monitor #(
   // 0x08004000 - 0x080040FF: Global, Fixed Egress & CPU Counters
   // 0x08004100 - 0x080041FF: Ingress Stream Counters (0x100 Offset)
   // 0x08004200 - 0x080042FF: Egress Worker Counters (0x200 Offset)
+  // 0x08004300 - 0x080043FF: Ingress Stream Drop Event Counters (0x300 Offset)
   logic is_perf_mon;
   assign is_perf_mon = (paddr_i[15:12] == 4'h4);
 
@@ -213,6 +221,13 @@ module performance_monitor #(
               prdata_o = egr_wkr_bus_bp_cnt_q[w];
             end
           end
+
+          for (int i = 0; i < N_STREAMS; i++) begin
+            if (word_idx == (10'h0C0 + i)) begin
+              prdata_o = ingr_stm_drop_evt_q[i];
+            end
+          end
+
         end
       endcase
     end

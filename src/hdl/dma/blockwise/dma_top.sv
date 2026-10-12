@@ -10,7 +10,6 @@ module dma_top #(
   parameter int STREAM_OFFSET_WIDTH = 10,
 
   localparam int MACRO_PTR_WIDTH  = $clog2(M_MACROS),
-  localparam int BANK_PTR_WIDTH   = $clog2(B_BANKS),
   localparam int META_MANAGER      = 1,
   localparam int NUM_MANAGERS      = W_WORKERS + META_MANAGER
 )(

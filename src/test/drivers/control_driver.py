@@ -56,6 +56,10 @@ class ControlDriver:
     OFF_WORKER_EGR_WKR_BUS_HS_CNT = 0x08 
     OFF_WORKER_EGR_WKR_BUS_BP_CNT = 0x0C
     
+    PERF_DROP_BASE = 0x300
+    PERF_DROP_STRIDE = 0x04
+    OFF_DROP_CNT = 0x00
+    
     
     def __init__(self, dut, driver_protocol="apb"):
         self.dut = dut
@@ -158,6 +162,7 @@ class ControlDriver:
         for n in range(self.n_streams):
             counters[f"PERF_INGR_HS_CNT_{n}"] = await self._get_perf_stream_counter(n, self.OFF_STREAM_INGR_HS_CNT)
             counters[f"PERF_INGR_BP_CNT_{n}"] = await self._get_perf_stream_counter(n, self.OFF_STREAM_INGR_BP_CNT)
+            counters[f"PERF_DROP_CNT_{n}"] = await self._get_perf_drop_counter(n)
             
         for w in range(self.w_workers):
             counters[f"PERF_EGR_WKR_BP_HS_CNT_{w}"] = await self._get_perf_worker_counter(w, self.OFF_WORKER_EGR_WKR_BP_HS_CNT)
@@ -176,6 +181,10 @@ class ControlDriver:
     
     async def _get_perf_stream_counter(self, stream_id, stream_offset):
         offset = self.PERF_STREAM_BASE + stream_id * self.PERF_STREAM_STRIDE + stream_offset
+        return await self._read_perf_register(offset)
+    
+    async def _get_perf_drop_counter(self, stream_id):
+        offset = self.PERF_DROP_BASE + (stream_id * self.PERF_DROP_STRIDE) + self.OFF_DROP_CNT
         return await self._read_perf_register(offset)
     
     async def _get_perf_worker_counter(self, worker_id, worker_offset):

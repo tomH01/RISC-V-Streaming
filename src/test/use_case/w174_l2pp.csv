@@ -1,4 +1,4 @@
-Sensor;Interval;Total Width;Total Height;Block Width (FT);Block Height (FT);Tile Width (FT);Tile Width (FT);Collection Size (FT);Execution Time (FT)
+Sensor;Interval;Total Width;Total Height;Block Width (FT);Block Height (FT);Tile Width (FT);Tile Height (FT);Collection Size (FT);Execution Time (FT)
 Front Cam 0;14;640;360;640;8;8;8;64;30
 Front Cam 1;14;640;360;640;8;8;8;64;30
 Side Cam 0;56;320;184;320;8;8;8;64;30

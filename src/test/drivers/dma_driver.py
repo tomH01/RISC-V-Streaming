@@ -102,6 +102,8 @@ class DMAInterleavedDriver(DMADriver):
         self.agu_done_ptrs = [0] * self.n_streams
         self.cpu_state = CPUOp.NOP
         
+        self.cycles_since_cpu_done_wr = 0
+        
     async def read_agu_done_ptr(self, stream_id):
         addr = self.META_BASE + (stream_id * self.data_width_b)
         return await self.data_driver.read(addr)
@@ -126,20 +128,23 @@ class DMAInterleavedDriver(DMADriver):
         return (CPUOp.READ_FIFO, addr)
     
     def set_next_state(self, pending_reads):
+        self.cycles_since_cpu_done_wr += 1
         avail_space = DMAInterleavedDriver.get_ring_dist(self.alloc_ptr, self.written_cpu_done_ptr, self.sram_size_b)
         unwritter_ptr = self.cpu_done_ptr != self.written_cpu_done_ptr
         
-        if unwritter_ptr and avail_space != 0 and avail_space <= self.sram_size_b // 4:
-            print(f"Available space is {avail_space}, writing CPU done pointer")
-            self.cpu_state = CPUOp.WRITE_CPU_DONE_PTR
-            return
 
         read_spaces, close_read_spaces = self.get_read_spaces()
-        
         pipeline_top = pending_reads[-1] if pending_reads else None
         is_agu_ptr_read = pipeline_top is not None and pipeline_top[0] == CPUOp.READ_AGU_DONE_PTR
-        
         effective_space = read_spaces if is_agu_ptr_read else close_read_spaces
+        
+        timeout_reached = self.cycles_since_cpu_done_wr > 100000
+        
+        if timeout_reached or (unwritter_ptr and avail_space != 0 and (avail_space <= self.sram_size_b // 4 or not effective_space)):
+            print(f"Available space is {avail_space}, writing CPU done pointer")
+            self.cycles_since_cpu_done_wr = 0
+            self.cpu_state = CPUOp.WRITE_CPU_DONE_PTR
+            return
         
         self.cpu_state = CPUOp.READ_DATA if effective_space else CPUOp.READ_AGU_DONE_PTR
             
@@ -153,6 +158,8 @@ class DMAInterleavedDriver(DMADriver):
 
         if ptrs:
             self.cpu_done_ptr = max(ptrs, key=lambda ptr: DMAInterleavedDriver.get_ring_dist(ptr, self.alloc_ptr, self.sram_size_b))
+        else:
+            self.cpu_done_ptr = self.alloc_ptr
             
     def get_read_spaces(self):
         read_spaces = {}
@@ -186,6 +193,8 @@ class DMAInterleavedDriver(DMADriver):
             return 0
         
         agu_dist = DMAInterleavedDriver.get_ring_dist(job['start'], agu_ptr, self.sram_size_b)
+        if agu_dist > job['size']:
+            return 0
         if agu_dist > self.sram_size_b // 2:
             return 0
         if agu_dist <= job['progress']:

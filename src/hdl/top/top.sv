@@ -10,7 +10,6 @@ module top #(
   parameter int STREAM_OFFSET_WIDTH = 10,
 
   localparam int MACRO_PTR_WIDTH   = $clog2(M_MACROS),
-  localparam int BANK_PTR_WIDTH    = $clog2(B_BANKS),
   localparam int DATA_WIDTH_BYTES  = DATA_WIDTH / 8,
   localparam int DMA_MANAGERS      = W_WORKERS
 )(
@@ -86,6 +85,7 @@ module top #(
   logic                 perf_dma_enable;
   logic [N_STREAMS-1:0] perf_ingr_stm_in_valid;
   logic [N_STREAMS-1:0] perf_ingr_stm_in_ready;
+  logic [N_STREAMS-1:0] perf_ingr_stm_drop_evt;
   logic                 perf_egr_job_req_valid;
   logic                 perf_egr_job_req_ready;
   logic                 perf_egr_meta_disp_valid;
@@ -147,6 +147,7 @@ module top #(
     .perf_dma_enable_o(perf_dma_enable),
     .perf_ingr_stm_in_valid_o(perf_ingr_stm_in_valid),
     .perf_ingr_stm_in_ready_o(perf_ingr_stm_in_ready),
+    .perf_ingr_stm_drop_evt_o(perf_ingr_stm_drop_evt),
     .perf_egr_job_req_valid_o(perf_egr_job_req_valid),
     .perf_egr_job_req_ready_o(perf_egr_job_req_ready),
     .perf_egr_meta_disp_valid_o(perf_egr_meta_disp_valid),
@@ -224,6 +225,7 @@ module top #(
 
     .ingr_stm_in_valid_i(perf_ingr_stm_in_valid),
     .ingr_stm_in_ready_i(perf_ingr_stm_in_ready),
+    .ingr_stm_drop_evt_i(perf_ingr_stm_drop_evt),
 
     .egr_job_req_valid_i(perf_egr_job_req_valid),
     .egr_job_req_ready_i(perf_egr_job_req_ready),
