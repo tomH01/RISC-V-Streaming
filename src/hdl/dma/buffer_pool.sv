@@ -5,7 +5,7 @@ module buffer_pool #(
   parameter int ADDR_WIDTH     = 32,
   parameter int MACRO_DEPTH    = 256,
 
-  localparam int MACRO_PTR_WIDTH = $clog2(M_MACROS)
+  localparam int MACRO_PTR_WIDTH = (M_MACROS > 1) ? $clog2(M_MACROS) : 1
 )(
   input logic clk_i,
   input logic rst_ni,

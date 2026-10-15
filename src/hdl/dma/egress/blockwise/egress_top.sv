@@ -1,4 +1,4 @@
-module egress_top #(
+module egress_top_bw #(
   parameter int N_STREAMS  = 4,
   parameter int M_MACROS   = 8,
   parameter int DATA_WIDTH = 32,

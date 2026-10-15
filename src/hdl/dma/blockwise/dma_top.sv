@@ -190,7 +190,7 @@ module dma_top #(
   logic [ADDR_WIDTH-1:0]      egr_addr         [W_WORKERS];
   logic [MACRO_PTR_WIDTH-1:0] egr_macro_select [W_WORKERS];
 
-  egress_top #(
+  egress_top_bw #(
     .N_STREAMS(N_STREAMS),
     .M_MACROS(M_MACROS),
     .DATA_WIDTH(DATA_WIDTH),

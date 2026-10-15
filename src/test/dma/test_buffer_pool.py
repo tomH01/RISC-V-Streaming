@@ -63,13 +63,13 @@ class BufferPoolDriver:
         await RisingEdge(self.dut.clk_i)
 
 
-    async def set_owner_ingr(self, macro_idx):
+    def set_owner_ingr(self, macro_idx):
         self.dut.egr_release_i[macro_idx].value = 1
 
-    async def set_owner_egr(self, macro_idx):
+    def set_owner_egr(self, macro_idx):
         self.dut.ingr_done_i[macro_idx].value = 1
         
-    async def write_ingress(self, macro_idx, addr, data, be=0xF):
+    def write_ingress(self, macro_idx, addr, data, be=0xF):
         cover_address(addr)
         cover_byte_enable(be)
 
@@ -78,7 +78,7 @@ class BufferPoolDriver:
         self.dut.ingr_wdata_i[macro_idx].value = data
         self.dut.ingr_be_i[macro_idx].value = be
 
-    async def read_egress(self, port_idx, macro_idx, addr):
+    def read_egress(self, port_idx, macro_idx, addr):
         cover_egress_select(macro_idx)
         cover_address(addr)
 
@@ -144,12 +144,12 @@ async def test_rw_coverage(dut):
                     addr = rnd.randrange(macro_depth)
                     data = rnd.randint(0, 0xFFFFFFFF)
 
-                    await driver.write_ingress(m_idx, addr * 4, data)
+                    driver.write_ingress(m_idx, addr * 4, data)
                     scoreboard[m_idx][addr] = data
                     num_writes += 1
 
                     if rnd.random() < 0.3 or len(scoreboard[m_idx]) > 10:
-                        await driver.set_owner_egr(m_idx)
+                        driver.set_owner_egr(m_idx)
                         pending_owner_change[m_idx] = 1
                         
         available_egr = [i for i , owner in enumerate(macro_owners) if owner == 1 and len(scoreboard[i]) > 0]
@@ -167,13 +167,13 @@ async def test_rw_coverage(dut):
                 addr = rnd.choice(list(scoreboard[m_idx].keys()))
                 expected_data = scoreboard[m_idx][addr]
                 
-                await driver.read_egress(port_idx, m_idx, addr * 4)
+                driver.read_egress(port_idx, m_idx, addr * 4)
                 
                 active_read_pipeline.append((1, port_idx, expected_data, addr, m_idx))
                 num_reads += 1
                 
                 if rnd.random() < 0.2:
-                    await driver.set_owner_ingr(m_idx)
+                    driver.set_owner_ingr(m_idx)
                     pending_owner_change[m_idx] = 0
 
     coverage_db.report_coverage(dut.log.info, bins=True)
